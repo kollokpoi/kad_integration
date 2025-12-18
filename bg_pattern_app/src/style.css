@@ -1,0 +1,15 @@
+@import 'tailwindcss';
+.p-card-body{
+    padding: 0!important;
+}
+.btn-main{
+    background-color: var(--color-blue-600)!important;
+}
+.btn-gray{
+    background-color: #2C2933!important;
+}
+.btn-img{
+    background-color: transparent!important;
+    border: none!important;
+    color: var(--color-blue-600)!important;
+}
