@@ -134,7 +134,7 @@
           <DataTable :value="skeletonData" class="p-datatable-sm" responsiveLayout="scroll">
             <Column field="date" header="Дата">
               <template #body>
-                <Skeleton height="1.5rem" class="mb-2" />s
+                <Skeleton height="1.5rem" class="mb-2" />
               </template>
             </Column>
             <Column field="case_number" header="Номер дела">
@@ -329,7 +329,7 @@ var fetch_data;
 const fetchData = async () => {
   try {
     // 1. Проверяем лимит перед запросом
-    //const initialClick = await bitrixService.addClick();
+    const initialClick = await bitrixService.addClick();
     console.log('Результат добавления клика:', initialClick);
 
     if (initialClick.isLimitReached) {

@@ -9,7 +9,7 @@
       </template>
     </PageHeader>
 
-    <Card class="shadow-md h-full">
+    <Card class="shadow-md h-full p-3">
       <template #title>
         <span>Картотека арбитражных дел</span>
       </template>
@@ -373,6 +373,8 @@ const mapping = {
 };
 
 const syncWithBitrix = async () => {
+  if(!fetch_data) return
+
   console.log('Массив элементов:', fetch_data);
   loading.value = true;
   try {
@@ -488,24 +490,12 @@ onMounted(async () => {
     }
 
     // Получаем данные сущности
-    const entityData = await bitrixService.GetRequisites(entityType, entityId);
-    console.log('Entity data:', entityData[0].RQ_INN);
-    if (entityType === 'company') {
-      if (entityData[0].RQ_INN) {
-        searchParams.value.inn = entityData[0].RQ_INN;
-      }
-    } else if (entityType === 'contact') {
-      if (entityData[0].RQ_INN) {
-        searchParams.value.inn = entityData[0].RQ_INN;
-      }
-    }
+    const entityData = await bitrixService.getInnFromEntity(entityType, entityId);
+    console.log('Entity data:', entityData);
+    searchParams.value.inn = entityData
   } catch (error) {
-    console.error('Initialization error:', {
-      error: error.message,
-      stack: error.stack,
-    });
 
-    // Можно показать toast с предупреждением, но не ошибкой
+
     toast.add({
       severity: 'warn',
       summary: 'Информация',

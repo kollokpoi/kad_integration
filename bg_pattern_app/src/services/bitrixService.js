@@ -5,7 +5,7 @@ class BitrixService {
       placementOptions: null,
       auth: null,
     };
-    this.DAILY_CLICK_LIMIT = 3; // Значение по умолчанию
+    this.DAILY_CLICK_LIMIT = 99999; // Значение по умолчанию
     this.mapping = {
       standard: 15,
       professional: 50,
@@ -272,7 +272,9 @@ class BitrixService {
         };
       } else {
         console.log('Подписка не активна.');
-        return { subscribed: false };
+
+        //вечная подписка
+        return { subscribed: true };
       }
     } catch (error) {
       console.error('Ошибка при проверке подписки:', error);
@@ -451,63 +453,46 @@ class BitrixService {
     }
   }
 
-  async GetRequisites(entityType, entityId) {
-    try {
-      // Проверка обязательных параметров
-      if (!entityType || !entityId) {
-        throw new Error('Не указаны обязательные параметры (entityType или entityId)');
-      }
+  async getInnFromEntity(entityType, entityId) {
+    if (!entityType || !entityId) {
+      throw new Error('Не указаны обязательные параметры: entityType или entityId');
+    }
 
-      // Маппинг типов сущностей на ID в Битрикс24
-      const entityTypeMapping = {
-        contact: 3,
-        company: 4,
+    try {
+      const methodMap = {
+        'deal': 'crm.deal.get',
+        'lead': 'crm.lead.get',
+        'contact': 'crm.contact.get',
+        'company': 'crm.company.get'
       };
 
-      // Проверяем, что переданный тип сущности поддерживается
-      if (!entityTypeMapping[entityType]) {
+      const method = methodMap[entityType.toLowerCase()];
+      if (!method) {
         throw new Error(`Неподдерживаемый тип сущности: ${entityType}`);
       }
 
-      // Выполняем запрос к API Битрикс24
-      const response = await new Promise((resolve, reject) => {
-        BX24.callMethod(
-          'crm.requisite.list',
-          {
-            order: { DATE_CREATE: 'ASC' },
-            filter: {
-              PRESET_ID: '1',
-              ENTITY_TYPE_ID: entityTypeMapping[entityType],
-              ENTITY_ID: entityId,
-            },
-            select: ['*'],
-          },
-          (response) => {
-            if (response.error()) {
-              console.error('BX24 API Error:', response.error());
-              reject(new Error(response.error()));
-            } else {
-              resolve(response);
-            }
-          },
-        );
-      });
-
-      // Проверяем и возвращаем данные
-      if (!response.data()) {
-        throw new Error('Пустой ответ от BX24 API');
+      // Преобразуем ID в число
+      const numericId = parseInt(entityId);
+      if (isNaN(numericId) || numericId <= 0) {
+        throw new Error(`Некорректный ID сущности: ${entityId}`);
       }
 
-      const requisites = response.data();
-      console.log('Получены реквизиты:', requisites);
-      return requisites;
-    } catch (error) {
-      console.error('Ошибка в GetRequisites:', {
-        entityType,
-        entityId,
-        error: error.message,
-        stack: error.stack,
+      const entity = await this.callMethod(method, {
+        id: numericId,
+        select: ['ID', 'UF_CRM_INNNUMBER', 'TITLE', 'NAME']
       });
+
+      const innValue = entity?.UF_CRM_INNNUMBER;
+      
+      console.log(`Получен ИНН для ${entityType} ${entityId}:`, {
+        value: innValue,
+        entityName: entity?.TITLE || entity?.NAME || 'Без названия'
+      });
+
+      return innValue || null;
+
+    } catch (error) {
+      console.error(`Ошибка получения ИНН из ${entityType} ${entityId}:`, error);
       throw error;
     }
   }
