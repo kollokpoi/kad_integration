@@ -1,4 +1,4 @@
-<template>
+<template class="p-2">
   <div class="h-full w-full p-6">
     <Toast position="top-right" />
     <!-- Заголовок страницы -->
@@ -393,12 +393,6 @@ const fetchData = async () => {
     cases.value = result;
     console.log('fetchData: cases.value', cases.value);
 
-    // ПРИМЕР 2: если точно знаете, что приходит { results: [] }
-    // cases.value = result.results || [];
-
-    // ПРИМЕР 3: если может быть и так, и так
-    // cases.value = Array.isArray(result) ? result : (result.results || []);
-
     if (cases.value.length === 0) {
       toast.add({
         severity: 'info',
@@ -469,11 +463,23 @@ const syncWithBitrix = async () => {
     const activities = fetch_data.map((item) => {
       const commentParts = [];
       if (item.date) commentParts.push(`Дата: ${item.date}`);
-      if (item.case_number) commentParts.push(`Результат: ${item.case_number}`);
+      if (item.case_number) commentParts.push(`Номер дела: ${item.case_number}`);
       if (item.court) commentParts.push(`Тип: ${item.court}`);
       if (item.judge) commentParts.push(`Субъект: ${item.judge}`);
       if (item.plaintiff) commentParts.push(`Доп. информация: ${item.plaintiff}`);
       if (item.case_link) commentParts.push(`Ссылка на дело: ${item.case_link}`);
+      if( item.case_details && item.case_details.length>0){
+        commentParts.push('Хронология')
+        item.case_details.forEach(caseDetail => {
+          commentParts.push(`Дата: ${caseDetail.date}`)
+          commentParts.push(caseDetail.result)
+          commentParts.push(`Тип: ${caseDetail.result}`)
+          commentParts.push(`Субъект: ${caseDetail.subject}`)
+          if(caseDetail.file_link)
+            commentParts.push(`Файл: ${caseDetail.file_link}`)
+          commentParts.push('/n')
+        });
+      }
 
       return {
         ENTITY_ID: placementInfoResult.options.ID,
@@ -485,6 +491,8 @@ const syncWithBitrix = async () => {
 
     // Добавляем ВСЕ активности одним запросом
     await bitrixService.addActivities(activities);
+
+    
 
     toast.add({
       severity: 'success',
