@@ -5,23 +5,26 @@
     <PageHeader>
       <template #title> Система интеграции с КАД </template>
       <template #subtitle>
-        Получайте актуальную информацию о судебных делах из картотеки арбитражных дел.
+        Получайте актуальную информацию о судебных делах из картотеки
+        арбитражных дел.
       </template>
     </PageHeader>
 
-    <Card class="shadow-md h-full p-3">
+    <Card class="shadow-md h-full p-2">
       <template #title>
-        <span>Картотека арбитражных дел</span>
+        <span class="font-bold text-black">Картотека арбитражных дел</span>
       </template>
       <template #subtitle>
-        <div class="text-sm text-black">Данные обновляются в режиме реального времени</div>
+        <div class="text-sm text-black">
+          Данные обновляются в режиме реального времени
+        </div>
       </template>
       <template #content>
         <div class="mb-4">
           <label
-              for="inn-input"
-              class="block text-sm font-medium text-gray-700 mb-1"
-              >ИНН организации</label
+            for="inn-input"
+            class="block text-sm font-medium text-gray-700 mb-1"
+            >ИНН организации</label
           >
 
           <div class="flex">
@@ -30,7 +33,8 @@
               v-model="searchParams.inn"
               placeholder="Введите ИНН организации"
               class="flex-1 p-2"
-              :disabled="loading" />
+              :disabled="loading"
+            />
             <div class="flex">
               <Button
                 label="Получить список дел"
@@ -38,35 +42,30 @@
                 class="p-button-primary btn-main mx-2"
                 @click="fetchData"
                 :loading="loading"
-                :disabled="loading || !searchParams.inn" />
+                :disabled="loading || !searchParams.inn"
+              />
               <Button
                 label="Синхронизация с Битрикс"
                 icon="pi pi-refresh"
                 class="p-button-success sync-button btn-gray mx-2"
                 @click="syncWithBitrix"
-                tooltip="Синхронизировать данные с Битрикс" />
+                tooltip="Синхронизировать данные с Битрикс"
+              />
             </div>
           </div>
         </div>
 
         <!-- Индикатор загрузки -->
-        <div
-          v-if="loading"
-          class="mb-4">
+        <div v-if="loading" class="mb-4">
           <div class="text-sm text-blue-600 mb-2 flex items-center">
             <i class="pi pi-spin pi-spinner mr-2"></i>
             <span>Загрузка данных из КАД...</span>
           </div>
-          <ProgressBar
-            mode="indeterminate"
-            style="height: 6px"
-            class="mb-4" />
+          <ProgressBar mode="indeterminate" style="height: 6px" class="mb-4" />
         </div>
 
         <!-- Таблица с данными -->
-        <div
-          v-if="!loading && cases.length > 0"
-          class="overflow-x-auto">
+        <div v-if="!loading && cases.length > 0" class="overflow-x-auto">
           <DataTable
             :value="cases"
             responsiveLayout="scroll"
@@ -76,29 +75,29 @@
             :rows="10"
             :rowsPerPageOptions="[5, 10, 20, 50]"
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
-            currentPageReportTemplate="Показано {first} - {last} из {totalRecords} дел">
-            <Column
-              field="date"
-              header="Дата"
-              sortable>
+            currentPageReportTemplate="Показано {first} - {last} из {totalRecords} дел"
+          >
+            <Column field="date" header="Дата" sortable>
               <template #body="{ data }">
                 <span class="font-medium">{{ formatDate(data.date) }}</span>
               </template>
             </Column>
 
-            <Column
-              field="case_number"
-              header="Номер дела"
-              sortable>
+            <Column field="case_number" header="Номер дела" sortable>
               <template #body="{ data }">
                 <router-link
                   custom
-                  :to="{ name: 'caseDetails', params: { caseNumber: data.case_number } }">
+                  :to="{
+                    name: 'caseDetails',
+                    params: { caseNumber: data.case_number },
+                  }"
+                >
                   <template #default="{ navigate }">
                     <a
                       href="#"
                       class="text-blue-600 font-medium hover:underline"
-                      @click.prevent="handleCaseClick(data, navigate)">
+                      @click.prevent="handleCaseClick(data, navigate)"
+                    >
                       {{ data.case_number }}
                     </a>
                   </template>
@@ -106,50 +105,33 @@
               </template>
             </Column>
 
-            <Column
-              field="case_link"
-              header="Ссылка на дело">
+            <Column field="case_link" header="Ссылка на дело">
               <template #body="{ data }">
                 <a
                   :href="data.case_link"
                   target="_blank"
-                  class="text-blue-600 hover:text-blue-800 hover:underline flex items-center">
+                  class="text-blue-600 hover:text-blue-800 hover:underline flex items-center"
+                >
                   <span>Открыть дело</span>
                   <i class="pi pi-external-link ml-1 text-xs"></i>
                 </a>
               </template>
             </Column>
 
-            <Column
-              field="judge"
-              header="Судья"
-              sortable />
-            <Column
-              field="court"
-              header="Суд"
-              sortable />
+            <Column field="judge" header="Судья" sortable />
+            <Column field="court" header="Суд" sortable />
 
-            <Column
-              field="plaintiff"
-              header="Истец"
-              sortable>
+            <Column field="plaintiff" header="Истец" sortable>
               <template #body="{ data }">
-                <div
-                  class="max-w-xs truncate"
-                  :title="data.plaintiff">
+                <div class="max-w-xs truncate" :title="data.plaintiff">
                   {{ data.plaintiff }}
                 </div>
               </template>
             </Column>
 
-            <Column
-              field="respondent"
-              header="Ответчик"
-              sortable>
+            <Column field="respondent" header="Ответчик" sortable>
               <template #body="{ data }">
-                <div
-                  class="max-w-xs truncate"
-                  :title="data.respondent">
+                <div class="max-w-xs truncate" :title="data.respondent">
                   {{ data.respondent }}
                 </div>
               </template>
@@ -160,72 +142,46 @@
         <!-- Скелеты для загрузки данных -->
         <div
           v-if="!loading && cases.length === 0 && firstLoad"
-          class="overflow-x-auto">
+          class="overflow-x-auto"
+        >
           <DataTable
             :value="skeletonData"
             class="p-datatable-sm"
-            responsiveLayout="scroll">
-            <Column
-              field="date"
-              header="Дата">
+            responsiveLayout="scroll"
+          >
+            <Column field="date" header="Дата">
               <template #body>
-                <Skeleton
-                  height="1.5rem"
-                  class="mb-2" />
+                <Skeleton height="1.5rem" class="mb-2" />
               </template>
             </Column>
-            <Column
-              field="case_number"
-              header="Номер дела">
+            <Column field="case_number" header="Номер дела">
               <template #body>
-                <Skeleton
-                  height="1.5rem"
-                  class="mb-2" />
+                <Skeleton height="1.5rem" class="mb-2" />
               </template>
             </Column>
-            <Column
-              field="case_link"
-              header="Ссылка на дело">
+            <Column field="case_link" header="Ссылка на дело">
               <template #body>
-                <Skeleton
-                  height="1.5rem"
-                  class="mb-2" />
+                <Skeleton height="1.5rem" class="mb-2" />
               </template>
             </Column>
-            <Column
-              field="judge"
-              header="Судья">
+            <Column field="judge" header="Судья">
               <template #body>
-                <Skeleton
-                  height="1.5rem"
-                  class="mb-2" />
+                <Skeleton height="1.5rem" class="mb-2" />
               </template>
             </Column>
-            <Column
-              field="court"
-              header="Суд">
+            <Column field="court" header="Суд">
               <template #body>
-                <Skeleton
-                  height="1.5rem"
-                  class="mb-2" />
+                <Skeleton height="1.5rem" class="mb-2" />
               </template>
             </Column>
-            <Column
-              field="plaintiff"
-              header="Истец">
+            <Column field="plaintiff" header="Истец">
               <template #body>
-                <Skeleton
-                  height="1.5rem"
-                  class="mb-2" />
+                <Skeleton height="1.5rem" class="mb-2" />
               </template>
             </Column>
-            <Column
-              field="respondent"
-              header="Ответчик">
+            <Column field="respondent" header="Ответчик">
               <template #body>
-                <Skeleton
-                  height="1.5rem"
-                  class="mb-2" />
+                <Skeleton height="1.5rem" class="mb-2" />
               </template>
             </Column>
           </DataTable>
@@ -234,7 +190,8 @@
         <!-- Сообщение об отсутствии данных -->
         <div
           v-if="!loading && cases.length === 0 && !firstLoad"
-          class="text-center py-8">
+          class="text-center py-8"
+        >
           <i class="pi pi-search text-4xl text-gray-400 mb-4"></i>
           <p class="text-gray-500">Нет доступных данных по судебным делам</p>
           <p class="text-sm text-gray-400 mt-2">
@@ -247,11 +204,11 @@
 </template>
 
 <script setup>
-import Toast from 'primevue/toast';
-import { useToast } from 'primevue/usetoast';
-import { onMounted, ref } from 'vue';
-import bitrixService from '../services/bitrixService.js';
-import { fetchArbitrationCases } from '../services/kad-api';
+import Toast from "primevue/toast";
+import { useToast } from "primevue/usetoast";
+import { onMounted, ref } from "vue";
+import bitrixService from "../services/bitrixService.js";
+import { fetchArbitrationCases } from "../services/kad-api";
 
 // Получаем toast напрямую
 const toast = useToast();
@@ -267,34 +224,34 @@ const skeletonData = Array(5).fill({});
 
 // Параметры поиска
 const searchParams = ref({
-  inn: '',
+  inn: "",
 });
 
 // Форматирование даты
 const formatDate = (dateString) => {
   if (/^\d{2}\.\d{2}\.\d{4}$/.test(dateString)) {
-    const [day, month, year] = dateString.split('.');
+    const [day, month, year] = dateString.split(".");
     const isoDate = `${year}-${month}-${day}`;
     const date = new Date(isoDate);
     if (isNaN(date.getTime())) {
-      console.error('Некорректная дата после преобразования:', isoDate);
-      return 'Неверная дата';
+      console.error("Некорректная дата после преобразования:", isoDate);
+      return "Неверная дата";
     }
-    return date.toLocaleDateString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
+    return date.toLocaleDateString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
     });
   } else {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) {
-      console.error('Некорректная дата:', dateString);
-      return 'Неверная дата';
+      console.error("Некорректная дата:", dateString);
+      return "Неверная дата";
     }
-    return date.toLocaleDateString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
+    return date.toLocaleDateString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
     });
   }
 };
@@ -308,9 +265,9 @@ const fetchData = async () => {
 
   if (!searchParams.value.inn) {
     toast.add({
-      severity: 'info',
-      summary: 'Информация',
-      detail: 'Введите ИНН для поиска',
+      severity: "info",
+      summary: "Информация",
+      detail: "Введите ИНН для поиска",
       life: 3000,
     });
     loading.value = false;
@@ -320,12 +277,12 @@ const fetchData = async () => {
   try {
     // 1. Проверяем лимит перед запросом
     const initialClick = await bitrixService.addClick();
-    console.log('Результат добавления клика:', initialClick);
+    console.log("Результат добавления клика:", initialClick);
 
     if (initialClick.isLimitReached) {
       toast.add({
-        severity: 'warn',
-        summary: 'Лимит',
+        severity: "warn",
+        summary: "Лимит",
         detail: initialClick.message,
         life: 5000,
       });
@@ -340,7 +297,7 @@ const fetchData = async () => {
 
     // 3. Выполняем запрос данных
     const result = await fetchArbitrationCases({
-      type: 'byInn',
+      type: "byInn",
       inn: searchParams.value.inn,
     });
 
@@ -348,17 +305,17 @@ const fetchData = async () => {
     fetch_data = cases.value;
 
     toast.add({
-      severity: 'success',
-      summary: 'Успешно',
+      severity: "success",
+      summary: "Успешно",
       detail: initialClick.message,
       life: 3000,
     });
   } catch (error) {
-    console.error('Ошибка при получении данных:', error);
+    console.error("Ошибка при получении данных:", error);
     toast.add({
-      severity: 'error',
-      summary: 'Ошибка',
-      detail: 'Ошибка при получении данных из КАД',
+      severity: "error",
+      summary: "Ошибка",
+      detail: "Ошибка при получении данных из КАД",
       life: 3000,
     });
   } finally {
@@ -366,26 +323,26 @@ const fetchData = async () => {
   }
 };
 const mapping = {
-  CRM_COMPANY_DETAIL_TAB: 'company',
-  CRM_CONTACT_DETAIL_TAB: 'contact',
-  CRM_DEAL_DETAIL_TAB: 'deal',
-  CRM_LEAD_DETAIL_TAB: 'lead',
+  CRM_COMPANY_DETAIL_TAB: "company",
+  CRM_CONTACT_DETAIL_TAB: "contact",
+  CRM_DEAL_DETAIL_TAB: "deal",
+  CRM_LEAD_DETAIL_TAB: "lead",
 };
 
 const syncWithBitrix = async () => {
-  if(!fetch_data) return
+  if (!fetch_data) return;
 
-  console.log('Массив элементов:', fetch_data);
+  console.log("Массив элементов:", fetch_data);
   loading.value = true;
   try {
     // Сначала проверяем подписку
     const subscriptionInfo = await bitrixService.checkSubscription();
     if (!subscriptionInfo.subscribed) {
       toast.add({
-        severity: 'warn',
-        summary: 'Ограничение доступа',
+        severity: "warn",
+        summary: "Ограничение доступа",
         detail:
-          'Синхронизация с Битрикс доступна только при активной подписке. Оформите подписку для использования этой функции во вкладке Тарифы.',
+          "Синхронизация с Битрикс доступна только при активной подписке. Оформите подписку для использования этой функции во вкладке Тарифы.",
         life: 5000,
         escape: false,
       });
@@ -393,7 +350,7 @@ const syncWithBitrix = async () => {
       return;
     }
     const placementInfoResult = await bitrixService.placementInfo();
-    console.log('Результат placementInfo():', placementInfoResult);
+    console.log("Результат placementInfo():", placementInfoResult);
 
     // Подготавливаем массив активностей для пакетной отправки
     const activities = fetch_data.map((item) => {
@@ -402,13 +359,15 @@ const syncWithBitrix = async () => {
       if (item.case_number) commentParts.push(`Результат: ${item.case_number}`);
       if (item.court) commentParts.push(`Тип: ${item.court}`);
       if (item.judge) commentParts.push(`Судья: ${item.judge}`);
-      if (item.plaintiff) commentParts.push(`Доп. информация: ${item.plaintiff}`);
-      if (item.case_link) commentParts.push(`Ссылка на дело: ${item.case_link}`);
+      if (item.plaintiff)
+        commentParts.push(`Доп. информация: ${item.plaintiff}`);
+      if (item.case_link)
+        commentParts.push(`Ссылка на дело: ${item.case_link}`);
 
       return {
         ENTITY_ID: placementInfoResult.options.ID,
         ENTITY_TYPE: mapping[placementInfoResult.placement],
-        COMMENT: commentParts.join('\n'), // или ', ' для одной строки
+        COMMENT: commentParts.join("\n"), // или ', ' для одной строки
         AUTHOR_ID: 1,
       };
     });
@@ -417,17 +376,17 @@ const syncWithBitrix = async () => {
     await bitrixService.addActivities(activities);
 
     toast.add({
-      severity: 'success',
-      summary: 'Синхронизация',
-      detail: 'Успешная синхронизация с Битрикс',
+      severity: "success",
+      summary: "Синхронизация",
+      detail: "Успешная синхронизация с Битрикс",
       life: 3000,
     });
   } catch (error) {
-    console.error('Ошибка синхронизации с Битрикс:', error);
+    console.error("Ошибка синхронизации с Битрикс:", error);
     toast.add({
-      severity: 'error',
-      summary: 'Ошибка',
-      detail: 'Не удалось синхронизироваться с Битрикс',
+      severity: "error",
+      summary: "Ошибка",
+      detail: "Не удалось синхронизироваться с Битрикс",
       life: 3000,
     });
   } finally {
@@ -438,18 +397,20 @@ const syncWithBitrix = async () => {
 async function handleCaseClick(data, navigate) {
   try {
     const subscriptionInfo = await bitrixService.checkSubscription();
-    const tariffKey = subscriptionInfo.tariffKey ? subscriptionInfo.tariffKey.toLowerCase() : '';
+    const tariffKey = subscriptionInfo.tariffKey
+      ? subscriptionInfo.tariffKey.toLowerCase()
+      : "";
 
     // Если подписка не активна или тариф не соответствует требованиям
     if (
       !subscriptionInfo.subscribed ||
-      (tariffKey !== 'professional' && tariffKey !== 'corporate')
+      (tariffKey !== "professional" && tariffKey !== "corporate")
     ) {
       toast.add({
-        severity: 'warn',
-        summary: 'Доступ ограничен',
+        severity: "warn",
+        summary: "Доступ ограничен",
         detail:
-          'Функционал комментариев и аналитика доступны только в платной версии. Перейдите на страницу тарифов для приобретения подписки.',
+          "Функционал комментариев и аналитика доступны только в платной версии. Перейдите на страницу тарифов для приобретения подписки.",
         life: 5000,
         escape: false,
       });
@@ -459,14 +420,14 @@ async function handleCaseClick(data, navigate) {
     // Если все условия выполнены, выполняем навигацию
     navigate();
   } catch (error) {
-    console.error('Ошибка проверки подписки:', error);
+    console.error("Ошибка проверки подписки:", error);
   }
 }
 
 onMounted(async () => {
   try {
     // Получаем информацию о размещении
-    const placementInfoResult = await bitrixService.placementInfo();
+   const placementInfoResult = await bitrixService.placementInfo();
 
     const mapping = {
       CRM_COMPANY_DETAIL_TAB: 'company',
@@ -489,13 +450,23 @@ onMounted(async () => {
       return;
     }
 
-    // Получаем данные сущности
-    const entityData = await bitrixService.getInnFromEntity(entityType, entityId);
-    console.log('Entity data:', entityData);
-    searchParams.value.inn = entityData
+    const userField = await bitrixService.GetUserfield(entityType, entityId);
+
+    // Устанавливаем номер дела
+    if (userField?.UF_CRM_INN) {
+      searchParams.value.inn = userField.UF_CRM_INN.toString();
+    } else {
+      console.warn('No ID in userField, using placement ID instead');
+      searchParams.value.inn = entityId.toString();
+    }
+
   } catch (error) {
+    console.error('Initialization error:', {
+      error: error.message,
+      stack: error.stack,
+    });
 
-
+    // Можно показать toast с предупреждением, но не ошибкой
     toast.add({
       severity: 'warn',
       summary: 'Информация',

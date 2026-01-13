@@ -453,49 +453,6 @@ class BitrixService {
     }
   }
 
-  async getInnFromEntity(entityType, entityId) {
-    if (!entityType || !entityId) {
-      throw new Error('Не указаны обязательные параметры: entityType или entityId');
-    }
-
-    try {
-      const methodMap = {
-        'deal': 'crm.deal.get',
-        'lead': 'crm.lead.get',
-        'contact': 'crm.contact.get',
-        'company': 'crm.company.get'
-      };
-
-      const method = methodMap[entityType.toLowerCase()];
-      if (!method) {
-        throw new Error(`Неподдерживаемый тип сущности: ${entityType}`);
-      }
-
-      // Преобразуем ID в число
-      const numericId = parseInt(entityId);
-      if (isNaN(numericId) || numericId <= 0) {
-        throw new Error(`Некорректный ID сущности: ${entityId}`);
-      }
-
-      const entity = await this.callMethod(method, {
-        id: numericId,
-        select: ['ID', 'UF_CRM_INNNUMBER', 'TITLE', 'NAME']
-      });
-
-      const innValue = entity?.UF_CRM_INNNUMBER;
-      
-      console.log(`Получен ИНН для ${entityType} ${entityId}:`, {
-        value: innValue,
-        entityName: entity?.TITLE || entity?.NAME || 'Без названия'
-      });
-
-      return innValue || null;
-
-    } catch (error) {
-      console.error(`Ошибка получения ИНН из ${entityType} ${entityId}:`, error);
-      throw error;
-    }
-  }
 
   async addActivities(activities) {
     try {
