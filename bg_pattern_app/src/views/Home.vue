@@ -457,7 +457,6 @@ onMounted(async () => {
       searchParams.value.inn = userField.UF_CRM_INN.toString();
     } else {
       console.warn('No ID in userField, using placement ID instead');
-      searchParams.value.inn = entityId.toString();
     }
 
   } catch (error) {

@@ -1,0 +1,34 @@
+RewriteEngine On
+
+# Базовый путь - КРИТИЧЕСКИ ВАЖНО!
+RewriteBase /Apps/bg_kad_integration/
+
+# Правило 1: API запросы - отправляем в папку api
+RewriteRule ^api/(.*)$ api/index.php?route=$1 [QSA,L]
+
+# Правило 2: Запросы к /install/ оставляем как есть
+RewriteRule ^install/(.*)$ install/$1 [L]
+
+# Правило 3: Запросы к /dist/ оставляем как есть (статичные файлы)
+RewriteRule ^dist/(.*)$ dist/$1 [L]
+
+# Правило 4: Если запрос к корню (/Apps/bg_kad_integration/) - показываем приложение
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^$ dist/index.html [L]
+
+# Правило 5: Все остальные запросы тоже на приложение (для SPA)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ dist/index.html [L]
+
+# Защита от доступа к конфигам
+<FilesMatch "\.(config|sql|env|log)$">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
+
+# Разрешаем CORS для API (можно здесь или в PHP)
+Header set Access-Control-Allow-Origin "*"
+Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+Header set Access-Control-Allow-Headers "Content-Type, Authorization"

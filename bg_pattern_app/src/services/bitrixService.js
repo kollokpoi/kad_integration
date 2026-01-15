@@ -162,7 +162,7 @@ class BitrixService {
         contacts: 'CRM_CONTACT_DETAIL_TAB',
       };
 
-      const defaultHandler = 'https://bg59.online/Apps/kad_test/dist/index.html';
+      const defaultHandler = 'https://bg59.online/Apps/bg_kad_integration/dist/index.html';
 
       // Вызываем bind только для тех сущностей, которые переданы
       const results = await Promise.allSettled(

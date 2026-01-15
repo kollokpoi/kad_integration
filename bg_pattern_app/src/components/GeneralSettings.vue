@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-white rounded-lg shadow-sm mt-2">
+  <div class="bg-white rounded-lg shadow-sm mt-2 p-2">
     <div class="mb-8">
       <h3 class="text-lg font-semibold text-gray-700 mb-4">Привязка к сущностям Битрикс24</h3>
       <p class="text-gray-600 mb-4">

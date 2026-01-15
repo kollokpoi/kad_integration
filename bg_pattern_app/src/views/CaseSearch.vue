@@ -600,7 +600,6 @@ onMounted(async () => {
       searchParams.value.caseNumber = userField.UF_CRM_NUMBER_CASE.toString();
     } else {
       console.warn('No ID in userField, using placement ID instead');
-      searchParams.value.caseNumber = entityId.toString();
     }
   } catch (error) {
     console.error('Initialization error:', {
