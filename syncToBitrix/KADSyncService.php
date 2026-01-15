@@ -121,13 +121,10 @@ class KADSyncService
         if (!empty($entitySyncFrequency) && $entitySyncFrequency >= 0) {
             $syncFrequency = (int)$entitySyncFrequency;
             $this->log("Частота из сущности: {$syncFrequency} дней");
-        } elseif ($settings['global_settings'] ?? true) {
+        } else{
             $syncFrequency = (int)($settings['frequency_days'] ?? 7);
             $this->log("Частота из глобальных: {$syncFrequency} дней");
-        } else {
-            $this->log("Синхронизация отключена (global_settings = false и нет настроек сущности)");
-            return;
-        }
+        } 
         $this->log("entityLastSync{$entityLastSync}");
         $lastSync = null;
 
@@ -140,16 +137,16 @@ class KADSyncService
         } elseif (!empty($entityLastSync))
             $lastSync = $entityLastSync;
 
-        // if ($lastSync) {
-        //     $lastSyncTime = strtotime($lastSync);
-        //     $nextSyncTime = $lastSyncTime + ($syncFrequency * 86400);
+        if ($lastSync) {
+            $lastSyncTime = strtotime($lastSync);
+            $nextSyncTime = $lastSyncTime + ($syncFrequency * 86400);
 
-        //     if (time() < $nextSyncTime) {
-        //         $daysLeft = ceil(($nextSyncTime - time()) / 86400);
-        //         $this->log("Рано синхронизировать. Следующая через {$daysLeft} дней");
-        //         return;
-        //     }
-        // }
+            if (time() < $nextSyncTime) {
+                $daysLeft = ceil(($nextSyncTime - time()) / 86400);
+                $this->log("Рано синхронизировать. Следующая через {$daysLeft} дней");
+                return;
+            }
+        }
 
         $saveToChat = false;
         $saveToTimeline = true;

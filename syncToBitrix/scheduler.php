@@ -19,7 +19,7 @@ require_once __DIR__ . '/KADSyncService.php';
 
 class SchedulerDaemon
 {
-    private $checkInterval = 60; // Проверять каждые 60 секунд
+    private $checkInterval = 1800; // Проверять каждые 60 секунд
     private $syncService;
     private $running = true;
 
