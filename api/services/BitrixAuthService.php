@@ -46,7 +46,7 @@ class BitrixAuthService
             throw new Exception("Токен не найден для портала: {$portalDomain}");
         }
 
-        // Если токен не истек, возвращаем его
+
         if (!$this->tokenModel->isExpired($portalDomain)) {
             return $token['access_token'];
         }
@@ -76,6 +76,7 @@ class BitrixAuthService
         $this->tokenModel->updateAccessToken(
             $portalDomain,
             $response['access_token'],
+            $response['refresh_token'],
             $response['expires_in'] ?? 3600
         );
 
@@ -116,6 +117,11 @@ class BitrixAuthService
     }
     private function makeHttpRequest($url, $params)
     {
+        $this->log("=== Bitrix24 API Запрос ===");
+        $this->log("URL: {$url}");
+        $this->log("Параметры: " . json_encode($params, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        $this->log("Метод: POST");
+
         $ch = curl_init();
 
         curl_setopt_array($ch, [
@@ -127,9 +133,77 @@ class BitrixAuthService
             CURLOPT_TIMEOUT => 10
         ]);
 
+        $startTime = microtime(true);
         $response = curl_exec($ch);
+        $endTime = microtime(true);
+
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        $totalTime = round(($endTime - $startTime) * 1000, 2); // в мс
+
         curl_close($ch);
 
+
+        $this->log("--- Ответ ---");
+        $this->log("HTTP код: {$httpCode}");
+        $this->log("Время выполнения: {$totalTime} мс");
+        $this->log("Размер ответа: " . strlen($response) . " байт");
+
+        // Форматируем вывод ответа для читаемости
+        $formattedResponse = $this->formatResponseForLog($response);
+        $this->log("Тело ответа:\n" . $formattedResponse);
+
         return json_decode($response, true);
+    }
+
+
+    private function formatResponseForLog($response)
+    {
+        // Пытаемся декодировать JSON для красивого форматирования
+        $decoded = json_decode($response, true);
+
+        if (json_last_error() === JSON_ERROR_NONE) {
+            // Форматируем JSON
+            $formatted = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+
+            // Если ответ очень большой, обрезаем его
+            if (strlen($formatted) > 2000) {
+                $formatted = substr($formatted, 0, 2000) . "\n... [ответ обрезан, размер: " . strlen($formatted) . " байт]";
+            }
+
+            return $formatted;
+        } else {
+            // Если не JSON, просто возвращаем как есть (с обрезкой если нужно)
+            if (strlen($response) > 2000) {
+                return substr($response, 0, 2000) . "\n... [ответ обрезан, размер: " . strlen($response) . " байт]";
+            }
+
+            return $response;
+        }
+    }
+
+    /**
+     * Обновленный метод log для лучшего форматирования
+     */
+    private function log($message)
+    {
+        $timestamp = date('Y-m-d H:i:s');
+        $formattedMessage = "[{$timestamp}] {$message}\n";
+
+        // Выводим в консоль с цветами (если поддерживается)
+        if (php_sapi_name() === 'cli') {
+            // Цвета для разных типов сообщений
+            if (strpos($message, 'ОШИБКА') !== false || strpos($message, 'ERROR') !== false) {
+                echo "\033[31m" . $formattedMessage . "\033[0m"; // Красный
+            } elseif (strpos($message, 'Успешно') !== false || strpos($message, 'завершен успешно') !== false) {
+                echo "\033[32m" . $formattedMessage . "\033[0m"; // Зеленый
+            } elseif (strpos($message, '---') !== false || strpos($message, '===') !== false) {
+                echo "\033[33m" . $formattedMessage . "\033[0m"; // Желтый
+            } else {
+                echo $formattedMessage;
+            }
+        } else {
+            echo $formattedMessage;
+        }
     }
 }

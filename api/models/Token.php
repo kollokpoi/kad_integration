@@ -11,12 +11,11 @@ class Token
 
     public function save($portalDomain, $tokenData)
     {
-        $expiresAt = date('Y-m-d H:i:s', time() + 3500);
-
         $token = $this->getByPortal($portalDomain);
         if (!empty($token)) {
-            return $this->updateAccessToken($portalDomain, $tokenData['access_token'], $tokenData['refresh_token'], $expiresAt);
+            return $this->updateAccessToken($portalDomain, $tokenData['access_token'], $tokenData['refresh_token']);
         } else {
+            $expiresAt = date('Y-m-d H:i:s', time() + 3500);
             $stmt = $this->pdo->prepare("
             INSERT INTO portal_oauth_tokens 
             (portal_domain, client_id, client_secret, access_token, 
@@ -58,36 +57,57 @@ class Token
 
     public function updateAccessToken($portalDomain, $accessToken, $refresh_token, $expiresIn = 3600)
     {
-        $expiresAt = date('Y-m-d H:i:s', time() + $expiresIn);
+        // Явно устанавливаем часовой пояс
+        $dateTime = new DateTime('now', new DateTimeZone('UTC'));
+        $currentTime = $dateTime->getTimestamp();
+
+        // Создаем DateTime для expires_at
+        $expiresDateTime = clone $dateTime;
+        $expiresDateTime->modify("+{$expiresIn} seconds");
+
+        $expiresAt = $expiresDateTime->format('Y-m-d H:i:s');
+        $updatedAt = $dateTime->format('Y-m-d H:i:s');
+
+        echo "\033[31m" . "сейчас timestamp: " . $currentTime . "\033[0m\n";
+        echo "\033[31m" . "expires timestamp: " . $expiresDateTime->getTimestamp() . "\033[0m\n";
+        echo "\033[31m" . "разница: " . ($expiresDateTime->getTimestamp() - $currentTime) . "\033[0m\n";
+        echo "\033[31m" . "истекает: " . $expiresAt . "\033[0m\n";
 
         $stmt = $this->pdo->prepare("
-            UPDATE portal_oauth_tokens 
-            SET access_token = :access_token,
-                refresh_token = :refresh_token,
-                expires_at = :expires_at,
-                updated_at = NOW()
-            WHERE portal_domain = :portal
-        ");
+        UPDATE portal_oauth_tokens 
+        SET access_token = :access_token,
+            refresh_token = :refresh_token,
+            expires_at = :expires_at,
+            updated_at = :updatedAt
+        WHERE portal_domain = :portal
+    ");
 
         return $stmt->execute([
             ':portal' => $portalDomain,
             ':access_token' => $accessToken,
             ':expires_at' => $expiresAt,
-            ':refresh_token' => $refresh_token
+            ':refresh_token' => $refresh_token,
+            ':updatedAt' => $updatedAt,
         ]);
     }
-
     public function isExpired($portalDomain)
     {
         $token = $this->getByPortal($portalDomain);
         if (!$token) {
             return true;
         }
+        $expiresDateTime = new DateTime($token['expires_at'], new DateTimeZone('UTC'));
+        $currentDateTime = new DateTime('now', new DateTimeZone('UTC'));
 
-        $expiresAt = strtotime($token['expires_at']);
-        $currentTime = time();
+        $expiresAt = $expiresDateTime->getTimestamp();
+        $currentTime = $currentDateTime->getTimestamp();
 
-        // Считаем токен просроченным за 5 минут до реального истечения
-        return ($expiresAt - $currentTime) < 300;
+        $difference = $expiresAt - $currentTime;
+
+        echo "\033[31m" . "сейчас: " . $currentTime . "\033[0m\n";
+        echo "\033[31m" . "истекает: " . $expiresAt . "\033[0m\n";
+        echo "\033[31m" . "разница: " . $difference . "\033[0m\n";
+
+        return $difference < 300;
     }
 }
