@@ -6,62 +6,112 @@
       <PageHeader>
         <template #title> Выберите свой тариф</template>
         <template #subtitle>
-          Найдите оптимальное решение для ваших задач. Все тарифы включают бесплатную техническую
-          поддержку.
+          Найдите оптимальное решение для ваших задач. Все тарифы включают
+          бесплатную техническую поддержку.
         </template>
       </PageHeader>
 
-      <!-- Карточки тарифов -->
+      <div v-if="authStore.isAuthenticated" class="subscription-status">
+        <div v-if="authStore.isSubscriptionActive" class="active-subscription">
+          <Card class="mb-3 p-3">
+            <template #content>
+              <div class="flex items-center justify-between gap-2">
+                <div >
+                  <i class="pi pi-check-circle text-green-500"></i>
+                  <span
+                    >Тариф:
+                    {{ authStore.currentTariff?.name || "Не указан" }}</span
+                  >
+                </div>
+                <div v-if="authStore.isTrial">
+                  <div class="text-600 text-sm mb-1">Триальный период</div>
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-clock text-orange-500"></i>
+                    <span class="font-semibold">
+                      Осталось {{ authStore.trialDaysLeft }} дней
+                    </span>
+                  </div>
+                  <small class="text-600">
+                    Заканчивается
+                    {{ formatDate(authStore.subscription?.trial_end_date) }}
+                  </small>
+                </div>
+
+                <div v-else>
+                  <div class="text-600 text-sm mb-1">Срок действия</div>
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-calendar text-blue-500"></i>
+                    <span class="font-semibold">
+                      Осталось {{ authStore.daysLeft }} дней
+                    </span>
+                  </div>
+                  <small class="text-600">
+                    Заканчивается
+                    {{ formatDate(authStore.subscription?.valid_until) }}
+                  </small>
+                </div>
+              </div>
+            </template>
+          </Card>
+        </div>
+
+        <div v-else>
+          <Message severity="warn" class="mb-3">
+            <div class="flex items-center gap-2">
+              <i class="pi pi-exclamation-triangle"></i>
+              <span>Подписка неактивна</span>
+            </div>
+          </Message>
+        </div>
+      </div>
+
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
         <div
           v-for="(plan, index) in plans"
           :key="plan.name"
           class="relative group"
-          :class="{ 'lg:-mt-4': plan.popular }">
-          <!-- Бейдж "Популярный" -->
-          <div
-            v-if="plan.popular"
-            class="absolute -top-4 inset-x-0 mx-auto w-32 bg-primary text-white rounded-full py-1 font-medium text-sm text-center shadow-md z-10">
-            Популярный
-          </div>
-
-          <!-- Карточка тарифа -->
+          :class="{ 'lg:-mt-4': plan.popular }"
+        >
           <Card
             class="transition-all duration-300 h-full overflow-hidden border"
             :class="[
-              plan.popular
-                ? 'shadow-lg border-primary'
-                : 'shadow-md border-gray-200 hover:shadow-xl',
+              'shadow-md border-gray-200 hover:shadow-xl',
               'group-hover:transform group-hover:scale-[1.02]',
-            ]">
-            <!-- Заголовок карточки -->
+            ]"
+          >
             <template #header>
               <div
                 class="p-4 border-b bg-gray-50"
-                :class="{ 'bg-primary bg-opacity-5': plan.popular }">
+                :class="{ 'bg-primary bg-opacity-5': plan.popular }"
+              >
                 <div class="flex flex-col items-center text-center">
-                  <h3 class="text-2xl font-bold text-gray-800">{{ plan.name }}</h3>
+                  <h3 class="text-2xl font-bold text-gray-800">
+                    {{ plan.name }}
+                  </h3>
                   <div class="flex items-baseline mt-2">
-                    <span class="text-3xl font-bold text-primary">{{ plan.priceValue }}</span>
+                    <span class="text-3xl font-bold text-primary">{{
+                      plan.price
+                    }}</span>
                     <span class="text-lg text-gray-600 ml-1">₽/мес</span>
                   </div>
                   <p
                     class="text-sm text-gray-500 mt-1"
-                    :class="{ 'text-white': plan.popular }">
-                    {{ plan.billing }}
+                    :class="{ 'text-white': plan.popular }"
+                  >
+                    {{ plan.description }}
                   </p>
                 </div>
               </div>
             </template>
 
-            <!-- Содержимое карточки -->
             <template #content>
               <div class="p-4">
                 <ul class="space-y-3 mb-8">
                   <li
                     v-for="(feature, idx) in plan.features"
                     :key="idx"
-                    class="flex items-start gap-3">
+                    class="flex items-start gap-3"
+                  >
                     <i class="pi pi-check-circle mt-1 text-primary"></i>
                     <span class="text-gray-700">{{ feature }}</span>
                   </li>
@@ -69,29 +119,36 @@
               </div>
             </template>
 
-            <!-- Футер карточки -->
             <template #footer>
               <div class="p-4 pt-0">
                 <Button
-                  v-if="plan.cta"
-                  :label="plan.cta"
-                  :class="[
-                    'w-full mb-3 p-button-lg',
-                    plan.popular ? 'p-button-raised' : 'p-button-outlined',
-                  ]"
-                  @click="contactTelegram(plan.name)" />
-
+                  v-if="
+                    authStore.currentTariff &&
+                    authStore.currentTariff.id === plan.id
+                  "
+                  class="w-full"
+                  outlined=""
+                  label="Текущий"
+                />
+                <Button
+                  v-else
+                  class="w-full"
+                  label="Выбрать"
+                  @click="goToActivatePortal(plan)"
+                />
                 <div class="flex justify-center gap-4 mt-4">
                   <a
                     @click.stop="contactTelegram(plan.name)"
-                    class="flex items-center text-gray-600 hover:text-primary cursor-pointer">
+                    class="flex items-center text-gray-600 hover:text-primary cursor-pointer"
+                  >
                     <i class="pi pi-send mr-1"></i>
                     <span class="text-sm">Telegram</span>
                   </a>
 
                   <a
                     @click.stop="contactEmail(plan.name)"
-                    class="flex items-center text-gray-600 hover:text-primary cursor-pointer">
+                    class="flex items-center text-gray-600 hover:text-primary cursor-pointer"
+                  >
                     <i class="pi pi-envelope mr-1"></i>
                     <span class="text-sm">Email</span>
                   </a>
@@ -101,8 +158,6 @@
           </Card>
         </div>
       </div>
-      <!-- Дополнительная информация -->
-
       <div class="mt-16 text-center">
         <p class="text-gray-600">
           Есть вопросы по тарифам?
@@ -128,79 +183,47 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue';
-import bitrixService from '../services/bitrixService.js';
+import { onMounted, ref } from "vue";
+import ApiService from "../services/subscriptionApi";
+import { useToast } from "primevue/usetoast";
+import { showSuccess, showError } from "../utils/toastUtils";
+import { useAuthStore } from "../stores/auth.store";
+
+const authStore = useAuthStore();
+const toast = useToast();
 const plans = ref([]);
+function formatDate(dateString) {
+  if (!dateString) return "—";
+  return new Date(dateString).toLocaleDateString("ru-RU");
+}
 
 onMounted(async () => {
   try {
-    const response = await fetch('https://bg59.online/Apps/bg_pattern_app/api/get_tariffs.php');
-    const result = await response.json();
-
-    if (result.status === 'success' && result.plans) {
-      plans.value = result.plans;
+    const response = await ApiService.tariffs.getForApp(
+      import.meta.env.VITE_APP_ID,
+    );
+    const auth = authStore.currentTariff;
+    if (response.success) {
+      plans.value = response.data;
     } else {
-      console.error('Ошибка получения тарифов:', result.message || 'Неизвестная ошибка', result);
+      showError(toast, `Ошибка загрузки тарифов`);
     }
   } catch (error) {
-    console.error('Ошибка загрузки тарифов:', error);
+    showError(toast, `Ошибка загрузки тарифов`);
   }
 });
 
-onMounted(() => {
-  bitrixService.initSubscriptionCheck();
-});
-
-const selectPlan = (plan) => {
-  console.log('Выбран тариф:', plan.name);
-  // Убрано использование Toast
-};
-
 const contactTelegram = () => {
   BX24.init(() => {
-    window.open('https://t.me/Background59_bot', '_blank');
+    window.open("https://t.me/Background59_bot", "_blank");
   });
 };
 
 const contactEmail = (planName) => {
   const subject = encodeURIComponent(`Покупка тарифа: ${planName}`);
-  const body = encodeURIComponent('Здравствуйте! Интересует подробная информация по тарифу...');
+  const body = encodeURIComponent(
+    "Здравствуйте! Интересует подробная информация по тарифу...",
+  );
   window.location.href = `mailto:it@bg59.ru?subject=${subject}&body=${body}`;
 };
 </script>
-
-<style scoped>
-/* Дополнительные стили для карточек */
-:deep(.p-card) {
-  border-radius: 12px;
-}
-
-:deep(.p-card .p-card-content) {
-  padding: 0;
-}
-
-:deep(.p-card .p-card-footer) {
-  padding: 0;
-}
-
-:deep(.p-card .p-card-body) {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-:deep(.p-card .p-card-content) {
-  flex: 1;
-}
-
-/* Стили для бейджа популярности */
-.bg-primary {
-  background-color: #3b82f6 !important; /* Цвет primary из Tailwind */
-  color: white !important;
-}
-
-/* Анимации при наведении */
-.transition-all {
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-</style>

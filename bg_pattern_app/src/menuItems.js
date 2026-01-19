@@ -3,11 +3,11 @@ import {
   Bars3Icon, // Для "Настройки"
   CurrencyDollarIcon, // Для "Тарифы"
   DocumentTextIcon, // Для "Документация"
-  HomeIcon, // Для "Главная"
+  HomeIcon, 
   LightBulbIcon,
   MagnifyingGlassIcon,
-  PencilIcon, // Для "Поиск"
-  QuestionMarkCircleIcon, // Для "Что нового?"
+  PencilIcon, 
+  QuestionMarkCircleIcon, 
   StarIcon,
   Cog6ToothIcon
 } from '@heroicons/vue/24/solid';

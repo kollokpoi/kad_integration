@@ -31,10 +31,8 @@ import Tag from 'primevue/tag';
 import Textarea from 'primevue/textarea';
 import Timeline from 'primevue/timeline';
 import Toast from 'primevue/toast';
-import ToastService from 'primevue/toastservice';
-//Импортим шапку
-import PageHeader from '../components/PageHeader.vue'; // Относительный путь к компоненту
-// Импортируем глобальные настройки
+import PageHeader from '../components/PageHeader.vue'; 
+import ToastService from 'primevue/toastservice'
 
 export default {
   install(app) {
@@ -49,11 +47,8 @@ export default {
       },
       ripple: true,
     });
-
-    // Предоставляем глобальные настройки через provide
-    app.use(ToastService);
+    app.use(ToastService)
     app.component('Toast', Toast);
-    // Глобальная регистрация компонента
     app.component('PageHeader', PageHeader);
     app.component('FileUpload', FileUpload);
     app.component('InputMask', InputMask);

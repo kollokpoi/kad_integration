@@ -1,7 +1,9 @@
 <template>
   <div class="bg-white rounded-lg shadow-sm mt-2 p-2">
     <div class="mb-8">
-      <h3 class="text-lg font-semibold text-gray-700 mb-4">Привязка к сущностям Битрикс24</h3>
+      <h3 class="text-lg font-semibold text-gray-700 mb-4">
+        Привязка к сущностям Битрикс24
+      </h3>
       <p class="text-gray-600 mb-4">
         Выберите сущности Битрикс24, к которым следует привязать приложение:
       </p>
@@ -10,14 +12,16 @@
         <div
           v-for="entity in entities"
           :key="entity.id"
-          class="border border-gray-200 rounded-lg p-4 transition-all hover:shadow-md">
+          class="border border-gray-200 rounded-lg p-4 transition-all hover:shadow-md"
+        >
           <div class="flex items-center justify-between">
             <div class="flex items-center">
               <Avatar
                 :icon="entity.icon"
                 :style="{ backgroundColor: entity.color }"
                 size="large"
-                class="mr-3" />
+                class="mr-3"
+              />
               <div>
                 <h4 class="font-medium text-gray-800">{{ entity.name }}</h4>
                 <p class="text-sm text-gray-500">{{ entity.description }}</p>
@@ -26,24 +30,23 @@
             <Checkbox
               v-model="entity.enabled"
               :binary="true"
-              @change="emitChange" />
+              @change="emitChange"
+            />
           </div>
         </div>
       </div>
     </div>
 
     <div class="flex gap-4 justify-end">
-      <Button
-        label="Отмена"
-        text
-        @click="resetSettings" />
+      <Button label="Отмена" text @click="resetSettings" />
       <Button
         label="Сохранить настройки"
         icon="pi pi-save"
         severity="success"
         class="btn-main"
         @click="saveSettings"
-        :loading="saving" />
+        :loading="saving"
+      />
     </div>
 
     <Dialog
@@ -51,17 +54,21 @@
       header="Подключение к Битрикс24"
       :modal="true"
       :closable="false"
-      :style="{ width: '450px' }">
+      :style="{ width: '450px' }"
+    >
       <div class="flex flex-col items-center p-4">
         <i
           class="pi pi-spin pi-spinner text-4xl text-primary mb-4"
-          v-if="connecting"></i>
+          v-if="connecting"
+        ></i>
         <i
           class="pi pi-check-circle text-4xl text-green-500 mb-4"
-          v-else-if="connected"></i>
+          v-else-if="connected"
+        ></i>
         <i
           class="pi pi-exclamation-circle text-4xl text-amber-500 mb-4"
-          v-else></i>
+          v-else
+        ></i>
 
         <h3 class="text-lg font-semibold text-gray-800 mb-2">
           {{ connectionStatus.title }}
@@ -76,69 +83,68 @@
           label="Закрыть"
           text
           @click="showConnectionDialog = false"
-          :disabled="connecting" />
+          :disabled="connecting"
+        />
         <Button
           v-if="!connected"
           label="Повторить"
           icon="pi pi-refresh"
           @click="connectToBitrix24"
-          :disabled="connecting" />
+          :disabled="connecting"
+        />
       </template>
     </Dialog>
 
-    <Toast position="top-right" />
   </div>
 </template>
 
 <script setup>
-import { useToast } from 'primevue/usetoast';
-import { computed, onMounted, reactive, ref } from 'vue';
-import { globalSettings } from '../globalSettings.js';
-import bitrixService from '../services/bitrixService.js';
+import { useToast } from "primevue/usetoast";
+import { computed, onMounted, reactive, ref } from "vue";
+import bitrixService from "../services/bitrixService.js";
 
 // Эмиты для родительского компонента
-const emit = defineEmits(['change']);
+const emit = defineEmits(["change"]);
 
-// Инициализация Toast
 const toast = useToast();
 
 // Функция для отправки события изменения родительскому компоненту
 const emitChange = () => {
-  emit('change');
+  emit("change");
 };
 
 // Сущности Битрикс24
 const entities = reactive([
   {
-    id: 'leads',
-    name: 'Лиды',
-    description: 'Потенциальные клиенты на начальном этапе',
-    icon: 'pi pi-user-plus',
-    color: '#ff9800',
+    id: "leads",
+    name: "Лиды",
+    description: "Потенциальные клиенты на начальном этапе",
+    icon: "pi pi-user-plus",
+    color: "#ff9800",
     enabled: false,
   },
   {
-    id: 'deals',
-    name: 'Сделки',
-    description: 'Текущие и потенциальные продажи',
-    icon: 'pi pi-dollar',
-    color: '#4caf50',
+    id: "deals",
+    name: "Сделки",
+    description: "Текущие и потенциальные продажи",
+    icon: "pi pi-dollar",
+    color: "#4caf50",
     enabled: false,
   },
   {
-    id: 'companies',
-    name: 'Компании',
-    description: 'Организации, с которыми ведется работа',
-    icon: 'pi pi-building',
-    color: '#2196f3',
+    id: "companies",
+    name: "Компании",
+    description: "Организации, с которыми ведется работа",
+    icon: "pi pi-building",
+    color: "#2196f3",
     enabled: false,
   },
   {
-    id: 'contacts',
-    name: 'Контакты',
-    description: 'Физические лица, являющиеся клиентами',
-    icon: 'pi pi-user',
-    color: '#9c27b0',
+    id: "contacts",
+    name: "Контакты",
+    description: "Физические лица, являющиеся клиентами",
+    icon: "pi pi-user",
+    color: "#9c27b0",
     enabled: false,
   },
 ]);
@@ -146,7 +152,7 @@ const entities = reactive([
 // Настройки приложения
 const settings = reactive({
   refreshInterval: 15,
-  displayMode: 'detailed',
+  displayMode: "detailed",
   notifications: true,
 });
 
@@ -161,35 +167,31 @@ const connected = ref(false);
 const connectionStatus = computed(() => {
   if (connecting.value) {
     return {
-      title: 'Подключение...',
-      message: 'Устанавливаем соединение с Битрикс24, пожалуйста, подождите.',
+      title: "Подключение...",
+      message: "Устанавливаем соединение с Битрикс24, пожалуйста, подождите.",
     };
   } else if (connected.value) {
     return {
-      title: 'Подключено',
-      message: 'Соединение с Битрикс24 успешно установлено.',
+      title: "Подключено",
+      message: "Соединение с Битрикс24 успешно установлено.",
     };
   } else {
     return {
-      title: 'Ошибка подключения',
+      title: "Ошибка подключения",
       message:
-        'Не удалось установить соединение с Битрикс24. Проверьте настройки и попробуйте снова.',
+        "Не удалось установить соединение с Битрикс24. Проверьте настройки и попробуйте снова.",
     };
   }
 });
 
 // Функция для отображения уведомлений с учетом настроек
 const showNotification = (severity, summary, detail, life = 3000) => {
-  if (globalSettings.toastEnabled) {
-    toast.add({
-      severity,
-      summary,
-      detail,
-      life,
-    });
-  } else {
-    console.log(`${summary}: ${detail}`);
-  }
+  toast.add({
+    severity,
+    summary,
+    detail,
+    life,
+  });
 };
 
 // Функция сохранения настроек
@@ -198,7 +200,9 @@ const saveSettings = async () => {
     saving.value = true;
 
     // Собираем выбранные и невыбранные сущности
-    const selectedEntities = entities.filter((entity) => entity.enabled).map((entity) => entity.id);
+    const selectedEntities = entities
+      .filter((entity) => entity.enabled)
+      .map((entity) => entity.id);
     const unselectedEntities = entities
       .filter((entity) => !entity.enabled)
       .map((entity) => entity.id);
@@ -208,28 +212,42 @@ const saveSettings = async () => {
       showConnectionDialog.value = true;
       await connectToBitrix24();
       if (!connected.value) {
-        showNotification('error', 'Ошибка', 'Не удалось установить соединение с Bitrix24');
+        showNotification(
+          "error",
+          "Ошибка",
+          "Не удалось установить соединение с Bitrix24",
+        );
         return;
       }
     }
 
     // Если подключение установлено и есть выбранные сущности – вызываем привязку
     if (selectedEntities.length > 0 && connected.value) {
-      const bindResult = await bitrixService.connectToEntities(selectedEntities);
+      const bindResult =
+        await bitrixService.connectToEntities(selectedEntities);
       if (bindResult) {
-        showNotification('info', 'Успешно', 'Привязка сущностей выполнена успешно');
+        showNotification(
+          "info",
+          "Успешно",
+          "Привязка сущностей выполнена успешно",
+        );
       } else {
-        showNotification('error', 'Ошибка', 'Ошибка при привязке сущностей');
+        showNotification("error", "Ошибка", "Ошибка при привязке сущностей");
       }
     }
 
     // Если подключение установлено и есть невыбранные сущности – вызываем отвязку
     if (unselectedEntities.length > 0 && connected.value) {
-      const unbindResult = await bitrixService.disconnectFromEntities(unselectedEntities);
+      const unbindResult =
+        await bitrixService.disconnectFromEntities(unselectedEntities);
       if (unbindResult) {
-        showNotification('info', 'Успешно', 'Отвязка сущностей выполнена успешно');
+        showNotification(
+          "info",
+          "Успешно",
+          "Отвязка сущностей выполнена успешно",
+        );
       } else {
-        showNotification('error', 'Ошибка', 'Ошибка при отвязке сущностей');
+        showNotification("error", "Ошибка", "Ошибка при отвязке сущностей");
       }
     }
 
@@ -239,11 +257,15 @@ const saveSettings = async () => {
       settings: { ...settings },
     });
 
-    showNotification('success', 'Настройки сохранены', 'Настройки приложения успешно сохранены');
+    showNotification(
+      "success",
+      "Настройки сохранены",
+      "Настройки приложения успешно сохранены",
+    );
     emitChange();
   } catch (error) {
-    console.error('Ошибка при сохранении настроек:', error);
-    showNotification('error', 'Ошибка', 'Не удалось сохранить настройки');
+    console.error("Ошибка при сохранении настроек:", error);
+    showNotification("error", "Ошибка", "Не удалось сохранить настройки");
   } finally {
     saving.value = false;
   }
@@ -262,12 +284,16 @@ const connectToBitrix24 = async () => {
     connected.value = result.success;
 
     if (connected.value) {
-      showNotification('success', 'Подключено', 'Соединение с Битрикс24 успешно установлено');
+      showNotification(
+        "success",
+        "Подключено",
+        "Соединение с Битрикс24 успешно установлено",
+      );
     }
   } catch (error) {
-    console.error('Ошибка при подключении к Битрикс24:', error);
+    console.error("Ошибка при подключении к Битрикс24:", error);
     connected.value = false;
-    showNotification('error', 'Ошибка', 'Не удалось подключиться к Битрикс24');
+    showNotification("error", "Ошибка", "Не удалось подключиться к Битрикс24");
   } finally {
     connecting.value = false;
   }
@@ -279,10 +305,14 @@ const resetSettings = () => {
     entity.enabled = false;
   });
   settings.refreshInterval = 15;
-  settings.displayMode = 'detailed';
+  settings.displayMode = "detailed";
   settings.notifications = true;
 
-  showNotification('info', 'Сброс', 'Настройки сброшены до значений по умолчанию');
+  showNotification(
+    "info",
+    "Сброс",
+    "Настройки сброшены до значений по умолчанию",
+  );
   emitChange();
 };
 
@@ -309,15 +339,17 @@ onMounted(async () => {
       connected.value = await bitrixService.isConnected();
     }
   } catch (error) {
-    console.error('Ошибка при загрузке настроек:', error);
-    showNotification('error', 'Ошибка загрузки', 'Не удалось загрузить сохраненные настройки');
+    console.error("Ошибка при загрузке настроек:", error);
+    showNotification(
+      "error",
+      "Ошибка загрузки",
+      "Не удалось загрузить сохраненные настройки",
+    );
   }
 });
 
-// Импорт компонентов PrimeVue
-import Avatar from 'primevue/avatar';
-import Button from 'primevue/button';
-import Checkbox from 'primevue/checkbox';
-import Dialog from 'primevue/dialog';
-import Toast from 'primevue/toast';
+import Avatar from "primevue/avatar";
+import Button from "primevue/button";
+import Checkbox from "primevue/checkbox";
+import Dialog from "primevue/dialog";
 </script>

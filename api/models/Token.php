@@ -68,11 +68,6 @@ class Token
         $expiresAt = $expiresDateTime->format('Y-m-d H:i:s');
         $updatedAt = $dateTime->format('Y-m-d H:i:s');
 
-        echo "\033[31m" . "сейчас timestamp: " . $currentTime . "\033[0m\n";
-        echo "\033[31m" . "expires timestamp: " . $expiresDateTime->getTimestamp() . "\033[0m\n";
-        echo "\033[31m" . "разница: " . ($expiresDateTime->getTimestamp() - $currentTime) . "\033[0m\n";
-        echo "\033[31m" . "истекает: " . $expiresAt . "\033[0m\n";
-
         $stmt = $this->pdo->prepare("
         UPDATE portal_oauth_tokens 
         SET access_token = :access_token,

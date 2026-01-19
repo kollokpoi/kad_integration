@@ -104,15 +104,12 @@
         />
       </template>
     </Dialog>
-
-    <Toast position="top-right" />
   </div>
 </template>
 
 <script setup>
 import { useToast } from "primevue/usetoast";
 import { computed, onMounted, reactive, ref } from "vue";
-import { globalSettings } from "../globalSettings.js";
 import bitrixService from "../services/bitrixService.js";
 
 const emit = defineEmits(["change"]);
@@ -158,16 +155,12 @@ const connectionStatus = computed(() => {
 });
 
 const showNotification = (severity, summary, detail, life = 3000) => {
-  if (globalSettings.toastEnabled) {
-    toast.add({
-      severity,
-      summary,
-      detail,
-      life,
-    });
-  } else {
-    console.log(`${summary}: ${detail}`);
-  }
+  toast.add({
+    severity,
+    summary,
+    detail,
+    life,
+  });
 };
 
 const saveSettings = async () => {
@@ -179,7 +172,7 @@ const saveSettings = async () => {
         showNotification(
           "error",
           "Ошибка",
-          "Не удалось установить соединение с Bitrix24"
+          "Не удалось установить соединение с Bitrix24",
         );
         return;
       }
@@ -200,7 +193,7 @@ const saveSettings = async () => {
     showNotification(
       "success",
       "Настройки сохранены",
-      "Настройки приложения успешно сохранены"
+      "Настройки приложения успешно сохранены",
     );
     emitChange();
   } catch (error) {
@@ -224,7 +217,7 @@ const connectToBitrix24 = async () => {
       showNotification(
         "success",
         "Подключено",
-        "Соединение с Битрикс24 успешно установлено"
+        "Соединение с Битрикс24 успешно установлено",
       );
     }
   } catch (error) {
@@ -246,7 +239,7 @@ const resetSettings = () => {
   showNotification(
     "info",
     "Сброс",
-    "Настройки сброшены до значений по умолчанию"
+    "Настройки сброшены до значений по умолчанию",
   );
   emitChange();
 };
@@ -266,7 +259,7 @@ onMounted(async () => {
     showNotification(
       "error",
       "Ошибка загрузки",
-      "Не удалось загрузить сохраненные настройки"
+      "Не удалось загрузить сохраненные настройки",
     );
   }
 });
@@ -274,7 +267,6 @@ onMounted(async () => {
 import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
 import Dialog from "primevue/dialog";
-import Toast from "primevue/toast";
 import InputNumber from "primevue/inputnumber";
 import apiService from "../services/apiService.js";
 </script>
