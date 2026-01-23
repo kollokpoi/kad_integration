@@ -10,5 +10,8 @@ export default defineConfig({
     outDir: 'dist', // или другой путь, если нужно
     emptyOutDir: true,
     external: ['chart.js/auto'],
+    rollupOptions:{
+      external:[]
+    }
   },
 });

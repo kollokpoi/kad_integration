@@ -1,5 +1,4 @@
-// src/services/apiClient.js
-class ApiClient {
+export class ApiClient {
   constructor(baseURL) {
     this.baseURL = baseURL;
     this.accessToken = null;
@@ -41,32 +40,26 @@ class ApiClient {
     const response = await fetch(url, config);
     const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(data.message || `HTTP ${response.status}`);
-    }
-
     return data;
   }
 
-  async get(endpoint, options = {}) {
+  get(endpoint, options = {}) {
     return this.request(endpoint, { ...options, method: 'GET' });
   }
 
-  async post(endpoint, body, options = {}) {
+  post(endpoint, body, options = {}) {
     return this.request(endpoint, { ...options, method: 'POST', body });
   }
 
-  async put(endpoint, body, options = {}) {
+  put(endpoint, body, options = {}) {
     return this.request(endpoint, { ...options, method: 'PUT', body });
   }
 
-  async patch(endpoint, body, options = {}) {
+  patch(endpoint, body, options = {}) {
     return this.request(endpoint, { ...options, method: 'PATCH', body });
   }
 
-  async delete(endpoint, options = {}) {
+  delete(endpoint, options = {}) {
     return this.request(endpoint, { ...options, method: 'DELETE' });
   }
 }
-
-export { ApiClient };

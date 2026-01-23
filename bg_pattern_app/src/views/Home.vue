@@ -21,36 +21,17 @@
       </template>
       <template #content>
         <div class="mb-4">
-          <label
-            for="inn-input"
-            class="block text-sm font-medium text-gray-700 mb-1"
-            >ИНН организации</label
-          >
+          <label for="inn-input" class="block text-sm font-medium text-gray-700 mb-1">ИНН организации</label>
 
           <div class="flex">
-            <InputText
-              id="inn-input"
-              v-model="searchParams.inn"
-              placeholder="Введите ИНН организации"
-              class="flex-1 p-2"
-              :disabled="loading"
-            />
+            <InputText id="inn-input" v-model="searchParams.inn" placeholder="Введите ИНН организации"
+              class="flex-1 p-2" :disabled="loading" />
             <div class="flex">
-              <Button
-                label="Получить список дел"
-                icon="pi pi-search"
-                class="p-button-primary btn-main mx-2"
-                @click="fetchData"
-                :loading="loading"
-                :disabled="loading || !searchParams.inn"
-              />
-              <Button
-                label="Синхронизация с Битрикс"
-                icon="pi pi-refresh"
-                class="p-button-success sync-button btn-gray mx-2"
-                @click="syncWithBitrix"
-                tooltip="Синхронизировать данные с Битрикс"
-              />
+              <Button label="Получить список дел" icon="pi pi-search" class="p-button-primary btn-main mx-2"
+                @click="fetchData" :loading="loading" :disabled="loading || !searchParams.inn" />
+              <Button label="Синхронизация с Битрикс" icon="pi pi-refresh"
+                class="p-button-success sync-button btn-gray mx-2" @click="syncWithBitrix"
+                tooltip="Синхронизировать данные с Битрикс" />
             </div>
           </div>
         </div>
@@ -66,17 +47,10 @@
 
         <!-- Таблица с данными -->
         <div v-if="!loading && cases.length > 0" class="overflow-x-auto">
-          <DataTable
-            :value="cases"
-            responsiveLayout="scroll"
-            class="p-datatable-sm"
-            stripedRows
-            paginator
-            :rows="10"
+          <DataTable :value="cases" responsiveLayout="scroll" class="p-datatable-sm" stripedRows paginator :rows="10"
             :rowsPerPageOptions="[5, 10, 20, 50]"
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
-            currentPageReportTemplate="Показано {first} - {last} из {totalRecords} дел"
-          >
+            currentPageReportTemplate="Показано {first} - {last} из {totalRecords} дел">
             <Column field="date" header="Дата" sortable>
               <template #body="{ data }">
                 <span class="font-medium">{{ formatDate(data.date) }}</span>
@@ -85,19 +59,13 @@
 
             <Column field="case_number" header="Номер дела" sortable>
               <template #body="{ data }">
-                <router-link
-                  custom
-                  :to="{
-                    name: 'caseDetails',
-                    params: { caseNumber: data.case_number },
-                  }"
-                >
+                <router-link custom :to="{
+                  name: 'caseDetails',
+                  params: { caseNumber: data.case_number },
+                }">
                   <template #default="{ navigate }">
-                    <a
-                      href="#"
-                      class="text-blue-600 font-medium hover:underline"
-                      @click.prevent="handleCaseClick(data, navigate)"
-                    >
+                    <a href="#" class="text-blue-600 font-medium hover:underline"
+                      @click.prevent="handleCaseClick(data, navigate)">
                       {{ data.case_number }}
                     </a>
                   </template>
@@ -107,11 +75,8 @@
 
             <Column field="case_link" header="Ссылка на дело">
               <template #body="{ data }">
-                <a
-                  :href="data.case_link"
-                  target="_blank"
-                  class="text-blue-600 hover:text-blue-800 hover:underline flex items-center"
-                >
+                <a :href="data.case_link" target="_blank"
+                  class="text-blue-600 hover:text-blue-800 hover:underline flex items-center">
                   <span>Открыть дело</span>
                   <i class="pi pi-external-link ml-1 text-xs"></i>
                 </a>
@@ -140,15 +105,8 @@
         </div>
 
         <!-- Скелеты для загрузки данных -->
-        <div
-          v-if="!loading && cases.length === 0 && firstLoad"
-          class="overflow-x-auto"
-        >
-          <DataTable
-            :value="skeletonData"
-            class="p-datatable-sm"
-            responsiveLayout="scroll"
-          >
+        <div v-if="!loading && cases.length === 0 && firstLoad" class="overflow-x-auto">
+          <DataTable :value="skeletonData" class="p-datatable-sm" responsiveLayout="scroll">
             <Column field="date" header="Дата">
               <template #body>
                 <Skeleton height="1.5rem" class="mb-2" />
@@ -188,10 +146,7 @@
         </div>
 
         <!-- Сообщение об отсутствии данных -->
-        <div
-          v-if="!loading && cases.length === 0 && !firstLoad"
-          class="text-center py-8"
-        >
+        <div v-if="!loading && cases.length === 0 && !firstLoad" class="text-center py-8">
           <i class="pi pi-search text-4xl text-gray-400 mb-4"></i>
           <p class="text-gray-500">Нет доступных данных по судебным делам</p>
           <p class="text-sm text-gray-400 mt-2">
@@ -209,12 +164,14 @@ import { useToast } from "primevue/usetoast";
 import { onMounted, ref } from "vue";
 import bitrixService from "../services/bitrixService.js";
 import { fetchArbitrationCases } from "../services/kad-api";
+import { useAuthStore } from '@payment-app/authSdk'
 
 // Получаем toast напрямую
 const toast = useToast();
 const dailyLimit = ref(10);
 const usedClicks = ref(0);
 const remainingClicks = ref(10);
+const authStore = useAuthStore();
 
 // Реактивные данные
 const loading = ref(false);
@@ -275,27 +232,19 @@ const fetchData = async () => {
   }
 
   try {
-    // 1. Проверяем лимит перед запросом
-    const initialClick = await bitrixService.addClick();
-    console.log("Результат добавления клика:", initialClick);
 
-    if (initialClick.isLimitReached) {
+    const clickAvalible = await authStore.isActionAvailable({key:'innSearch.count'})
+    if (!clickAvalible.available) {
       toast.add({
         severity: "warn",
-        summary: "Лимит",
-        detail: initialClick.message,
+        summary: "Лимит превышен",
+        detail: clickAvalible.message,
         life: 5000,
       });
       loading.value = false;
       return;
     }
 
-    // 2. Обновляем UI
-    dailyLimit.value = initialClick.limit;
-    usedClicks.value = initialClick.count;
-    remainingClicks.value = initialClick.limit - initialClick.count;
-
-    // 3. Выполняем запрос данных
     const result = await fetchArbitrationCases({
       type: "byInn",
       inn: searchParams.value.inn,
@@ -307,7 +256,7 @@ const fetchData = async () => {
     toast.add({
       severity: "success",
       summary: "Успешно",
-      detail: initialClick.message,
+      detail: `За месяц поиск выполнен: ${clickAvalible.newUsed} из ${clickAvalible.limit} доступных раз`,
       life: 3000,
     });
   } catch (error) {
@@ -427,7 +376,7 @@ async function handleCaseClick(data, navigate) {
 onMounted(async () => {
   try {
     // Получаем информацию о размещении
-   const placementInfoResult = await bitrixService.placementInfo();
+    const placementInfoResult = await bitrixService.placementInfo();
 
     const mapping = {
       CRM_COMPANY_DETAIL_TAB: 'company',

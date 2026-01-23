@@ -1,17 +1,16 @@
 import { createRouter, createWebHistory } from "vue-router";
 import FullLayout from "../layouts/FullLayout.vue";
-import { useAuthStore } from "../stores/auth.store";
 import Home from "../views/Home.vue";
 import Tariffs from "../views/Tariffs.vue";
 import WhatsNew from "../views/WhatsNew.vue";
 import SubmitIdea from "../views/SubmitIdea.vue";
+import {useAuthStore} from "@payment-app/authSdk"
 
 const CaseSearch = () => import("../views/CaseSearch.vue");
 const Settings = () => import("../views/Settings.vue");
 const OurSolutions = () => import("../views/OurSolutions.vue");
 const CaseDetails = () => import("../views/CaseDetails.vue");
 const NotFound = () => import("../views/NotFound.vue");
-const Registration = () => import("../views/Registration.vue");
 
 const routes = [
   {
@@ -24,7 +23,6 @@ const routes = [
         component: Home,
         meta: {
           title: "Главная",
-          requiresAuth: true,
         },
       },
       {
@@ -33,7 +31,6 @@ const routes = [
         component: CaseSearch,
         meta: {
           title: "Поиск дел",
-          requiresAuth: true,
         },
       },
       {
@@ -42,7 +39,6 @@ const routes = [
         component: Settings,
         meta: {
           title: "Настройки",
-          requiresAuth: true,
         },
       },
       {
@@ -51,7 +47,6 @@ const routes = [
         component: OurSolutions,
         meta: {
           title: "Наши решения",
-          requiresAuth: true,
         },
       },
       {
@@ -60,7 +55,6 @@ const routes = [
         component: Tariffs,
         meta: {
           title: "Тарифы",
-          requiresAuth: false,
         },
       },
       {
@@ -69,7 +63,6 @@ const routes = [
         component: WhatsNew,
         meta: {
           title: "Что нового",
-          requiresAuth: false,
         },
       },
       {
@@ -78,7 +71,6 @@ const routes = [
         component: SubmitIdea,
         meta: {
           title: "Предложить идею",
-          requiresAuth: false,
         },
       },
       {
@@ -87,7 +79,6 @@ const routes = [
         component: CaseDetails,
         meta: {
           title: "Детали дела",
-          requiresAuth: true,
         },
       },
       {
@@ -119,15 +110,6 @@ const routes = [
       },
     ],
   },
-  {
-    path: "/register",
-    name: "register",
-    component: Registration,
-    meta: {
-      title: "Регистрация",
-      requiresAuth: false,
-    },
-  },
 ];
 
 const router = createRouter({
@@ -142,36 +124,40 @@ const router = createRouter({
   },
 });
 
-router.beforeEach(async (to, from, next) => {
-  if (to.meta.title) {
-    document.title = `${to.meta.title} | KAD`;
-  }
-
-  const authStore = useAuthStore();
-
-  if (!authStore.isInitialized) {
-    await authStore.initialize();
-  }
-
+router.beforeEach((to, from, next) => {
+  const authStore = useAuthStore()
+  
   if (to.meta.requiresAuth) {
-    if (authStore.isAuthenticated) {
-      if(authStore.isSubscriptionActive)
-        next();
-      else
-        next({name:"tariffs"})
-      return;
+    if (!authStore.isAuthenticated) {
+      next('/auth-error')
+      return
     }
 
-    const loginResult = await authStore.login();
-
-    if (loginResult.success) {
-      next();
-    } else {
-      next({ name: "register" });
+    if (!authStore.canAccessPage(to.name)) {
+      next('/auth-error?reason=no_access')
+      return
     }
-    return;
   }
-  next();
-});
+
+  next()
+})
+
+router.onError((error, to) => {
+  console.error('Ошибка навигации:', error)
+
+  if (error.message.includes('авторизации') || error.message.includes('инициализации')) {
+    router.push({
+      name: 'auth-error',
+      query: {
+        error: error.message,
+        from: to.fullPath
+      }
+    })
+    return false
+  }
+
+  router.push('/not-found')
+  return false
+})
 
 export default router;

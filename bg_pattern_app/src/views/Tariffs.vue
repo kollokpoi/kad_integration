@@ -16,12 +16,10 @@
           <Card class="mb-3 p-3">
             <template #content>
               <div class="flex items-center justify-between gap-2">
-                <div >
+                <div>
                   <i class="pi pi-check-circle text-green-500"></i>
-                  <span
-                    >Тариф:
-                    {{ authStore.currentTariff?.name || "Не указан" }}</span
-                  >
+                  <span>Тариф:
+                    {{ authStore.currentTariff?.name || "Не указан" }}</span>
                 </div>
                 <div v-if="authStore.isTrial">
                   <div class="text-600 text-sm mb-1">Триальный период</div>
@@ -66,24 +64,14 @@
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-        <div
-          v-for="(plan, index) in plans"
-          :key="plan.name"
-          class="relative group"
-          :class="{ 'lg:-mt-4': plan.popular }"
-        >
-          <Card
-            class="transition-all duration-300 h-full overflow-hidden border"
-            :class="[
-              'shadow-md border-gray-200 hover:shadow-xl',
-              'group-hover:transform group-hover:scale-[1.02]',
-            ]"
-          >
+        <div v-for="(plan, index) in plans" :key="plan.name" class="relative group"
+          :class="{ 'lg:-mt-4': plan.popular }">
+          <Card class="transition-all duration-300 h-full overflow-hidden border" :class="[
+            'shadow-md border-gray-200 hover:shadow-xl',
+            'group-hover:transform group-hover:scale-[1.02]',
+          ]">
             <template #header>
-              <div
-                class="p-4 border-b bg-gray-50"
-                :class="{ 'bg-primary bg-opacity-5': plan.popular }"
-              >
+              <div class="p-4 border-b bg-gray-50" :class="{ 'bg-primary bg-opacity-5': plan.popular }">
                 <div class="flex flex-col items-center text-center">
                   <h3 class="text-2xl font-bold text-gray-800">
                     {{ plan.name }}
@@ -94,10 +82,7 @@
                     }}</span>
                     <span class="text-lg text-gray-600 ml-1">₽/мес</span>
                   </div>
-                  <p
-                    class="text-sm text-gray-500 mt-1"
-                    :class="{ 'text-white': plan.popular }"
-                  >
+                  <p class="text-sm text-gray-500 mt-1" :class="{ 'text-white': plan.popular }">
                     {{ plan.description }}
                   </p>
                 </div>
@@ -107,11 +92,7 @@
             <template #content>
               <div class="p-4">
                 <ul class="space-y-3 mb-8">
-                  <li
-                    v-for="(feature, idx) in plan.features"
-                    :key="idx"
-                    class="flex items-start gap-3"
-                  >
+                  <li v-for="(feature, idx) in plan.features" :key="idx" class="flex items-start gap-3">
                     <i class="pi pi-check-circle mt-1 text-primary"></i>
                     <span class="text-gray-700">{{ feature }}</span>
                   </li>
@@ -121,34 +102,20 @@
 
             <template #footer>
               <div class="p-4 pt-0">
-                <Button
-                  v-if="
-                    authStore.currentTariff &&
-                    authStore.currentTariff.id === plan.id
-                  "
-                  class="w-full"
-                  outlined=""
-                  label="Текущий"
-                />
-                <Button
-                  v-else
-                  class="w-full"
-                  label="Выбрать"
-                  @click="goToActivatePortal(plan)"
-                />
+                <Button v-if="
+                  authStore.currentTariff &&
+                  authStore.currentTariff.id === plan.id
+                " class="w-full" outlined="" label="Текущий" />
+                <Button v-else class="w-full" label="Выбрать" @click="goToActivatePortal(plan)" />
                 <div class="flex justify-center gap-4 mt-4">
-                  <a
-                    @click.stop="contactTelegram(plan.name)"
-                    class="flex items-center text-gray-600 hover:text-primary cursor-pointer"
-                  >
+                  <a @click.stop="contactTelegram(plan.name)"
+                    class="flex items-center text-gray-600 hover:text-primary cursor-pointer">
                     <i class="pi pi-send mr-1"></i>
                     <span class="text-sm">Telegram</span>
                   </a>
 
-                  <a
-                    @click.stop="contactEmail(plan.name)"
-                    class="flex items-center text-gray-600 hover:text-primary cursor-pointer"
-                  >
+                  <a @click.stop="contactEmail(plan.name)"
+                    class="flex items-center text-gray-600 hover:text-primary cursor-pointer">
                     <i class="pi pi-envelope mr-1"></i>
                     <span class="text-sm">Email</span>
                   </a>
@@ -161,21 +128,11 @@
       <div class="mt-16 text-center">
         <p class="text-gray-600">
           Есть вопросы по тарифам?
-          <a
-            href="https://vedernikov.bitrix24.ru/online/oninechat"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-primary font-medium hover:underline"
-            >Свяжитесь с нами</a
-          >
+          <a href="https://vedernikov.bitrix24.ru/online/oninechat" target="_blank" rel="noopener noreferrer"
+            class="text-primary font-medium hover:underline">Свяжитесь с нами</a>
           или посмотрите
-          <a
-            href="https://www.bitrix24.ru/partners/partner/13927904/"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-primary font-medium hover:underline"
-            >ответы на частые вопросы</a
-          >.
+          <a href="https://www.bitrix24.ru/partners/partner/13927904/" target="_blank" rel="noopener noreferrer"
+            class="text-primary font-medium hover:underline">ответы на частые вопросы</a>.
         </p>
       </div>
     </div>
@@ -184,25 +141,24 @@
 
 <script setup>
 import { onMounted, ref } from "vue";
-import ApiService from "../services/subscriptionApi";
 import { useToast } from "primevue/usetoast";
-import { showSuccess, showError } from "../utils/toastUtils";
-import { useAuthStore } from "../stores/auth.store";
+import { showError } from "../utils/toastUtils";
+import { useAuthStore } from '@payment-app/authSdk'
 
 const authStore = useAuthStore();
 const toast = useToast();
 const plans = ref([]);
+const api = authStore.api
+
 function formatDate(dateString) {
   if (!dateString) return "—";
   return new Date(dateString).toLocaleDateString("ru-RU");
 }
-
-onMounted(async () => {
+const loadTariffs = async () => {
   try {
-    const response = await ApiService.tariffs.getForApp(
+    const response = await api.tariffs.getForApp(
       import.meta.env.VITE_APP_ID,
     );
-    const auth = authStore.currentTariff;
     if (response.success) {
       plans.value = response.data;
     } else {
@@ -211,6 +167,10 @@ onMounted(async () => {
   } catch (error) {
     showError(toast, `Ошибка загрузки тарифов`);
   }
+}
+
+onMounted(async () => {
+  await loadTariffs();
 });
 
 const contactTelegram = () => {

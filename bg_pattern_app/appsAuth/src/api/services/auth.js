@@ -1,10 +1,18 @@
-class AuthService {
+export class AuthService {
   constructor(apiClient) {
     this.api = apiClient;
   }
 
   async login(domain, applicationId) {
     const response = await this.api.post("/api/auth/login", {
+      domain,
+      applicationId,
+    });
+    return response;
+  }
+
+  async register(domain, applicationId) {
+    const response = await this.api.post("/api/auth/register", {
       domain,
       applicationId,
     });
@@ -24,20 +32,9 @@ class AuthService {
     });
     return response;
   }
-  
-  async register(domain, applicationId, data = {}) {
-    const response = await this.api.post("/api/auth/register", {
-      domain,
-      applicationId,
-      ...data,
-    });
-    return response;
-  }
 
   async validateToken() {
     const response = await this.api.get("/api/auth/validate");
     return response;
   }
 }
-
-export { AuthService };
