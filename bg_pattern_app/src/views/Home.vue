@@ -64,8 +64,7 @@
                   params: { caseNumber: data.case_number },
                 }">
                   <template #default="{ navigate }">
-                    <a href="#" class="text-blue-600 font-medium hover:underline"
-                      @click.prevent="handleCaseClick(data, navigate)">
+                    <a href="#" class="text-blue-600 font-medium hover:underline">
                       {{ data.case_number }}
                     </a>
                   </template>
@@ -168,9 +167,6 @@ import { useAuthStore } from '@payment-app/authSdk'
 
 // Получаем toast напрямую
 const toast = useToast();
-const dailyLimit = ref(10);
-const usedClicks = ref(0);
-const remainingClicks = ref(10);
 const authStore = useAuthStore();
 
 // Реактивные данные
@@ -284,20 +280,7 @@ const syncWithBitrix = async () => {
   console.log("Массив элементов:", fetch_data);
   loading.value = true;
   try {
-    // Сначала проверяем подписку
-    const subscriptionInfo = await bitrixService.checkSubscription();
-    if (!subscriptionInfo.subscribed) {
-      toast.add({
-        severity: "warn",
-        summary: "Ограничение доступа",
-        detail:
-          "Синхронизация с Битрикс доступна только при активной подписке. Оформите подписку для использования этой функции во вкладке Тарифы.",
-        life: 5000,
-        escape: false,
-      });
-      loading.value = false;
-      return;
-    }
+  
     const placementInfoResult = await bitrixService.placementInfo();
     console.log("Результат placementInfo():", placementInfoResult);
 
@@ -343,35 +326,6 @@ const syncWithBitrix = async () => {
   }
 };
 
-async function handleCaseClick(data, navigate) {
-  try {
-    const subscriptionInfo = await bitrixService.checkSubscription();
-    const tariffKey = subscriptionInfo.tariffKey
-      ? subscriptionInfo.tariffKey.toLowerCase()
-      : "";
-
-    // Если подписка не активна или тариф не соответствует требованиям
-    if (
-      !subscriptionInfo.subscribed ||
-      (tariffKey !== "professional" && tariffKey !== "corporate")
-    ) {
-      toast.add({
-        severity: "warn",
-        summary: "Доступ ограничен",
-        detail:
-          "Функционал комментариев и аналитика доступны только в платной версии. Перейдите на страницу тарифов для приобретения подписки.",
-        life: 5000,
-        escape: false,
-      });
-      return; // не вызываем navigate, переход не происходит
-    }
-
-    // Если все условия выполнены, выполняем навигацию
-    navigate();
-  } catch (error) {
-    console.error("Ошибка проверки подписки:", error);
-  }
-}
 
 onMounted(async () => {
   try {

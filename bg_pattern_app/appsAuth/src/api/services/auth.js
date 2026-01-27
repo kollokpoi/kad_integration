@@ -3,18 +3,20 @@ export class AuthService {
     this.api = apiClient;
   }
 
-  async login(domain, applicationId) {
+  async login(domain, applicationId, auth) {
     const response = await this.api.post("/api/auth/login", {
       domain,
       applicationId,
+      auth
     });
     return response;
   }
 
-  async register(domain, applicationId) {
+  async register(domain, applicationId, auth) {
     const response = await this.api.post("/api/auth/register", {
       domain,
       applicationId,
+      auth
     });
     return response;
   }

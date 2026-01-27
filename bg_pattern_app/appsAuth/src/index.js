@@ -19,9 +19,11 @@ export class B24AuthSDK {
    */
   async determineDomain() {
     // 1. Из BX24
-    if (typeof BX24 !== 'undefined' && BX24!==null) {
+    if (typeof BX24 !== 'undefined' && BX24 !== null) {
       try {
-        console.log(BX24)
+        if (BX24.isAdmin()) {
+          this.config.auth = BX24.getAuth();
+        }
         this.domain = BX24.getDomain();
         return this.domain;
       } catch (error) {
@@ -58,16 +60,16 @@ export class B24AuthSDK {
   async createStore() {
     // Определяем домен
     await this.determineDomain();
-    
+
     // Создаем store
     const store = useAuthStore();
-    
+
     // Инициализируем store с конфигом и доменом
     await store.initialize({
       ...this.config,
       domain: this.domain  // Передаем уже определенный домен!
     }, this.api);
-    
+
     return store;
   }
 }

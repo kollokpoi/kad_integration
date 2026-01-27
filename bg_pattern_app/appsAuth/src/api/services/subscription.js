@@ -13,8 +13,18 @@ export class SubscriptionService {
     return response;
   }
 
-  async checkActionAvalible(action){
-    const response = await this.api.post('/api/subscription/checkavalible',action)
+  async checkActionAvalible(action) {
+    const response = await this.api.post('/api/subscription/checkavalible', action)
+    return response;
+  }
+
+  async updateToken(auth) {
+    const response = await this.api.post('/api/subscription/updatetoken', auth)
+    return response;
+  }
+
+  async updateMetadata(newMetadata){
+    const response = await this.api.post('/api/subscription/update',{updates:newMetadata})
     return response;
   }
 }

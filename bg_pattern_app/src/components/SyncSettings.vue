@@ -18,27 +18,17 @@
 
         <label class="block text-sm font-medium mb-2">
           Сохранять результаты в таймлайн:
-          <Checkbox
-            v-model="settings.save_to_timeline"
-            :binary="true"
-            class="ml-2"
-          />
+          <Checkbox v-model="settings.save_to_timeline" :binary="true" class="ml-2" />
         </label>
 
         <label class="block text-sm font-medium mb-2">
-          Сохранять результаты в чат:<Checkbox
-            v-model="settings.save_to_chat"
-            :binary="true"
-            class="ml-2"
-          />
+          Сохранять результаты в чат:
+          <Checkbox v-model="settings.save_to_chat" :binary="true" class="ml-2" />
         </label>
 
         <label class="block text-sm font-medium mb-2">
-          Использовать глобальные настройки:<Checkbox
-            v-model="settings.global_settings"
-            :binary="true"
-            class="ml-2"
-          />
+          Использовать глобальные настройки:
+          <Checkbox v-model="settings.global_settings" :binary="true" class="ml-2" />
         </label>
 
         <label class="block text-sm font-medium mb-2">
@@ -49,36 +39,16 @@
 
     <div class="flex gap-4 justify-end">
       <Button label="Отмена" text @click="resetSettings" />
-      <Button
-        label="Сохранить настройки"
-        icon="pi pi-save"
-        severity="success"
-        class="btn-main"
-        @click="saveSettings"
-        :loading="saving"
-      />
+      <Button label="Сохранить настройки" icon="pi pi-save" severity="success" class="btn-main" @click="saveSettings"
+        :loading="saving" />
     </div>
 
-    <Dialog
-      v-model:visible="showConnectionDialog"
-      header="Подключение к Битрикс24"
-      :modal="true"
-      :closable="false"
-      :style="{ width: '450px' }"
-    >
+    <Dialog v-model:visible="showConnectionDialog" header="Подключение к Битрикс24" :modal="true" :closable="false"
+      :style="{ width: '450px' }">
       <div class="flex flex-col items-center p-4">
-        <i
-          class="pi pi-spin pi-spinner text-4xl text-primary mb-4"
-          v-if="connecting"
-        ></i>
-        <i
-          class="pi pi-check-circle text-4xl text-green-500 mb-4"
-          v-else-if="connected"
-        ></i>
-        <i
-          class="pi pi-exclamation-circle text-4xl text-amber-500 mb-4"
-          v-else
-        ></i>
+        <i class="pi pi-spin pi-spinner text-4xl text-primary mb-4" v-if="connecting"></i>
+        <i class="pi pi-check-circle text-4xl text-green-500 mb-4" v-else-if="connected"></i>
+        <i class="pi pi-exclamation-circle text-4xl text-amber-500 mb-4" v-else></i>
 
         <h3 class="text-lg font-semibold text-gray-800 mb-2">
           {{ connectionStatus.title }}
@@ -89,19 +59,9 @@
       </div>
 
       <template #footer>
-        <Button
-          label="Закрыть"
-          text
-          @click="showConnectionDialog = false"
-          :disabled="connecting"
-        />
-        <Button
-          v-if="!connected"
-          label="Повторить"
-          icon="pi pi-refresh"
-          @click="connectToBitrix24"
-          :disabled="connecting"
-        />
+        <Button label="Закрыть" text @click="showConnectionDialog = false" :disabled="connecting" />
+        <Button v-if="!connected" label="Повторить" icon="pi pi-refresh" @click="connectToBitrix24"
+          :disabled="connecting" />
       </template>
     </Dialog>
   </div>
@@ -111,7 +71,9 @@
 import { useToast } from "primevue/usetoast";
 import { computed, onMounted, reactive, ref } from "vue";
 import bitrixService from "../services/bitrixService.js";
+import { useAuthStore } from "@payment-app/authSdk";
 
+const authStore = useAuthStore();
 const emit = defineEmits(["change"]);
 
 const toast = useToast();
@@ -165,36 +127,21 @@ const showNotification = (severity, summary, detail, life = 3000) => {
 
 const saveSettings = async () => {
   try {
-    if (!connected.value) {
-      showConnectionDialog.value = true;
-      await connectToBitrix24();
-      if (!connected.value) {
-        showNotification(
-          "error",
-          "Ошибка",
-          "Не удалось установить соединение с Bitrix24",
-        );
-        return;
-      }
+    const sync_settings = {
+      last_sync: settings.last_sync,
+      global_settings: settings.global_settings,
+      frequency_days: settings.frequency_days,
+      save_to_chat: settings.save_to_chat,
+      save_to_timeline: settings.save_to_timeline,
+    };
+    const response = await authStore.updateMetadata({ sync_settings })
+    if (response.success) {
+      showNotification(
+        "success",
+        "Настройки сохранены",
+        "Настройки приложения успешно сохранены",
+      );
     }
-
-    if (connected.value) {
-      const plainObject = {
-        last_sync: settings.last_sync,
-        global_settings: settings.global_settings,
-        frequency_days: settings.frequency_days,
-        save_to_chat: settings.save_to_chat,
-        save_to_timeline: settings.save_to_timeline,
-      };
-
-      await apiService.updateSettings(plainObject);
-    }
-
-    showNotification(
-      "success",
-      "Настройки сохранены",
-      "Настройки приложения успешно сохранены",
-    );
     emitChange();
   } catch (error) {
     console.error("Ошибка при сохранении настроек:", error);
@@ -230,7 +177,7 @@ const connectToBitrix24 = async () => {
 };
 
 // Сброс настроек
-const resetSettings = () => {
+const resetSettings = async () => {
   settings.last_sync = null;
   settings.global_settings = false;
   settings.frequency_days = 7;
@@ -241,17 +188,16 @@ const resetSettings = () => {
     "Сброс",
     "Настройки сброшены до значений по умолчанию",
   );
+  await saveSettings()
   emitChange();
 };
 
-// Загрузка настроек при монтировании компонента
 onMounted(async () => {
   try {
-    const response = await apiService.loadSettings();
+    const metadata = authStore.subscription.metadata;
 
-    console.log(response);
-    if (response) {
-      Object.assign(settings, response.data.settings);
+    if (metadata.sync_settings) {
+      Object.assign(settings, metadata.sync_settings);
       connected.value = await bitrixService.isConnected();
     }
   } catch (error) {
@@ -268,5 +214,4 @@ import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
 import Dialog from "primevue/dialog";
 import InputNumber from "primevue/inputnumber";
-import apiService from "../services/apiService.js";
 </script>

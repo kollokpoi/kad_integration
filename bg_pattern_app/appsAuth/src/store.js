@@ -7,12 +7,14 @@ export const useAuthStore = defineStore('auth', () => {
   const refreshToken = ref(null);
   const subscription = ref(null);
   const currentTariff = ref(null);
+  const application = ref(null)
   const domain = ref(null);
   const appId = ref(null);
   const isLoading = ref(false);
   const isInitialized = ref(false);
   const error = ref(null);
   const api = ref(null)
+  const auth = ref(null)
 
   // Computed
   const isAuthenticated = computed(() => {
@@ -42,6 +44,35 @@ export const useAuthStore = defineStore('auth', () => {
     return Array.isArray(pages) ? pages : [pages];
   });
 
+  const canAccessPage = (pageName) => {
+    if (!currentTariff.value) return false;
+
+    const pages = currentTariff.value.limits?.availablePages;
+    if (!pages) return true; // Если ограничений нет - доступ есть
+
+    return Array.isArray(pages)
+      ? pages.includes(pageName)
+      : pages === pageName;
+  };
+
+  const canSyncEntity = (entityName) => {
+    if (!currentTariff.value) return false;
+
+    const entities = availableEntities.value
+    if (!entities) return true;
+
+    return Array.isArray(entities)
+      ? entities.includes(entityName)
+      : entities === entityName;
+  };
+
+  const availableEntities = computed(() => {
+    if (!currentTariff.value?.limits?.avalibleEntities) return [];
+
+    const entities = currentTariff.value.limits.avalibleEntities;
+    return Array.isArray(entities) ? entities : [entities];
+  });
+
   // Actions
   async function initialize(config, apiClient) {
     if (!config.appId) throw new Error('appId is required');
@@ -50,20 +81,23 @@ export const useAuthStore = defineStore('auth', () => {
 
     isLoading.value = true;
     error.value = null;
-
+    console.log(config)
     // Сохраняем конфиг и API
     appId.value = config.appId;
     domain.value = config.domain;
     api.value = apiClient;
 
+    if (config.auth)
+      auth.value = config.auth;
+
     try {
-      // Загружаем сохраненные токены
       loadTokens();
       isInitialized.value = true
-      // Если есть токены, устанавливаем их в API и загружаем подписку
+
       if (accessToken.value && refreshToken.value) {
         api.value.setTokens(accessToken.value, refreshToken.value);
         await loadSubscriptionAndTariff();
+        await loadApplicaion()
       }
     } catch (err) {
       console.error('Auth initialization failed:', err);
@@ -100,12 +134,26 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (subscriptionResponse.success && subscriptionResponse.data) {
         subscription.value = subscriptionResponse.data;
+        await updateToken()
       }
       if (tariffResponse.success && tariffResponse.data) {
         currentTariff.value = tariffResponse.data;
       }
     } catch (err) {
       console.error('Failed to load subscription:', err);
+    }
+  }
+
+  async function loadApplicaion() {
+    if (!api.value) return;
+    try {
+      const applicaiton = await api.value.applications.get(appId.value);
+
+      if (applicaiton.success && applicaiton.data) {
+        application.value = applicaiton.data;
+      }
+    } catch (err) {
+      console.error('Failed to load application:', err);
     }
   }
 
@@ -118,12 +166,11 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null;
 
     try {
-      const loginResponse = await api.value.auth.login(domain.value, appId.value);
+      const loginResponse = await api.value.auth.login(domain.value, appId.value, auth.value);
 
       if (loginResponse.success) {
         const { subscription: subData, tokens } = loginResponse.data;
 
-        // Сохраняем токены
         saveTokens(tokens.accessToken, tokens.refreshToken);
         api.value.setTokens(tokens.accessToken, tokens.refreshToken);
 
@@ -153,7 +200,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null;
 
     try {
-      const registerResponse = await api.value.auth.register(domain.value, appId.value);
+      const registerResponse = await api.value.auth.register(domain.value, appId.value, auth.value);
 
       if (registerResponse.success) {
         const { subscription: subData, tokens } = registerResponse.data;
@@ -179,16 +226,22 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  const canAccessPage = (pageName) => {
-    if (!currentTariff.value) return false;
-
-    const pages = currentTariff.value.limits?.availablePages;
-    if (!pages) return true; // Если ограничений нет - доступ есть
-
-    return Array.isArray(pages)
-      ? pages.includes(pageName)
-      : pages === pageName;
-  };
+  async function updateToken() {
+    if (!api.value || !subscription.value) {
+      throw new Error('Store not properly initialized');
+    }
+    isLoading.value = true;
+    error.value = null;
+    try {
+      if (auth.value)
+        await api.value.subscriptions.updateToken(auth.value);
+    } catch (err) {
+      console.error('update token failed:', err);
+      error.value = err.message;
+    } finally {
+      isLoading.value = false;
+    }
+  }
 
   function saveTokens(access, refresh) {
     try {
@@ -208,7 +261,6 @@ export const useAuthStore = defineStore('auth', () => {
       console.error('Failed to save tokens:', err);
     }
   }
-
   async function logout() {
     try {
       if (refreshToken.value && api.value) {
@@ -220,7 +272,6 @@ export const useAuthStore = defineStore('auth', () => {
       clearAuth();
     }
   }
-
   function clearAuth() {
     try {
       if (domain.value) {
@@ -241,8 +292,6 @@ export const useAuthStore = defineStore('auth', () => {
       console.error('Failed to clear auth:', err);
     }
   }
-
-
   async function isActionAvailable(action) {
     try {
       const response = await api.value.subscriptions.checkActionAvalible(action)
@@ -257,6 +306,20 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function updateMetadata(newMetadata) {
+    try {
+      const response = await api.value.subscriptions.updateMetadata(newMetadata)
+      if (response.success) {
+        return response
+      } else {
+        return { success: false, message: 'Сохранение не выполнено' };
+      }
+    } catch (err) {
+      console.error('Failed to clear auth:', err);
+      return { success: false, message: err.message };
+    }
+  }
+
   return {
     // State
     accessToken,
@@ -268,6 +331,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading,
     error,
     isInitialized,
+    application,
     api,
 
     // Computed
@@ -275,6 +339,7 @@ export const useAuthStore = defineStore('auth', () => {
     isSubscriptionActive,
     daysLeft,
     availablePages,
+    availableEntities,
 
     // Actions
     initialize,
@@ -282,7 +347,9 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     clearAuth,
     canAccessPage,
+    canSyncEntity,
     isActionAvailable,
-    register
+    register,
+    updateMetadata
   };
 });

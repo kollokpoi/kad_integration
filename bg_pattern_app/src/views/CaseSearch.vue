@@ -22,47 +22,21 @@
       </template>
       <template #content>
         <div class="mb-4">
-          <label
-            for="case-number-input"
-            class="block text-sm font-medium text-gray-700 mb-1"
-            >Номер дела</label
-          >
+          <label for="case-number-input" class="block text-sm font-medium text-gray-700 mb-1">Номер дела</label>
           <div class="flex">
-            <InputText
-              id="case-number-input"
-              v-model="searchParams.caseNumber"
-              placeholder="Например: А50-5568/2008"
-              class="flex-1 p-2"
-              :disabled="loading"
-            />
+            <InputText id="case-number-input" v-model="searchParams.caseNumber" placeholder="Например: А50-5568/2008"
+              class="flex-1 p-2" :disabled="loading" />
             <div class="flex">
-              <Button
-                label="Найти дело"
-                icon="pi pi-search"
-                class="p-button-primary btn-main mx-2"
-                @click="fetchData"
-                :loading="loading"
-                :disabled="loading || !searchParams.caseNumber"
-              />
-              <Button
-                label="Синхронизация с Битрикс"
-                icon="pi pi-refresh"
-                class="p-button-success sync-button btn-gray mx-2"
-                @click="syncWithBitrix"
-                tooltip="Синхронизировать данные с Битрикс"
-              />
+              <Button label="Найти дело" icon="pi pi-search" class="p-button-primary btn-main mx-2" @click="fetchData"
+                :loading="loading" :disabled="loading || !searchParams.caseNumber" />
+              <Button label="Синхронизация с Битрикс" icon="pi pi-refresh"
+                class="p-button-success sync-button btn-gray mx-2" @click="syncWithBitrix"
+                tooltip="Синхронизировать данные с Битрикс" />
             </div>
           </div>
-          <Checkbox
-            v-model="searchParams.includeTimeline"
-            :binary="true"
-            :disabled="loading"
-            inputId="include-timeline"
-          />
-          <label
-            for="include-timeline"
-            class="ml-2 text-sm font-medium text-gray-700"
-          >
+          <Checkbox v-model="searchParams.includeTimeline" :binary="true" :disabled="loading"
+            inputId="include-timeline" />
+          <label for="include-timeline" class="ml-2 text-sm font-medium text-gray-700">
             Хронология дела
           </label>
         </div>
@@ -78,17 +52,10 @@
 
         <!-- Таблица с результатами поиска -->
         <div v-if="!loading && cases.length > 0" class="overflow-x-auto">
-          <DataTable
-            :value="cases"
-            responsiveLayout="scroll"
-            class="p-datatable-sm"
-            stripedRows
-            paginator
-            :rows="10"
+          <DataTable :value="cases" responsiveLayout="scroll" class="p-datatable-sm" stripedRows paginator :rows="10"
             :rowsPerPageOptions="[5, 10, 20, 50]"
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
-            currentPageReportTemplate="Показано {first} - {last} из {totalRecords} дел"
-          >
+            currentPageReportTemplate="Показано {first} - {last} из {totalRecords} дел">
             <Column field="date" header="Дата" sortable>
               <template #body="{ data }">
                 <span class="font-medium">{{ formatDate(data.date) }}</span>
@@ -103,11 +70,8 @@
             </Column>
             <Column field="case_link" header="Ссылка на дело">
               <template #body="{ data }">
-                <a
-                  :href="data.case_link"
-                  target="_blank"
-                  class="text-blue-600 hover:text-blue-800 hover:underline flex items-center"
-                >
+                <a :href="data.case_link" target="_blank"
+                  class="text-blue-600 hover:text-blue-800 hover:underline flex items-center">
                   <span>Открыть дело</span>
                   <i class="pi pi-external-link ml-1 text-xs"></i>
                 </a>
@@ -131,29 +95,16 @@
             </Column>
             <Column header="Действия">
               <template #body="{ data }">
-                <Button
-                  v-if="data.case_details && data.case_details.length > 0"
-                  icon="pi pi-list"
-                  label="Хронология"
-                  class="p-button-info"
-                  @click="showTimelineDialog(data)"
-                  tooltip="Посмотреть хронологию дела"
-                />
+                <Button v-if="data.case_details && data.case_details.length > 0" icon="pi pi-list" label="Хронология"
+                  class="p-button-info" @click="showTimelineDialog(data)" tooltip="Посмотреть хронологию дела" />
               </template>
             </Column>
           </DataTable>
         </div>
 
         <!-- Скелеты для загрузки -->
-        <div
-          v-if="!loading && cases.length === 0 && firstLoad"
-          class="overflow-x-auto"
-        >
-          <DataTable
-            :value="skeletonData"
-            class="p-datatable-sm"
-            responsiveLayout="scroll"
-          >
+        <div v-if="!loading && cases.length === 0 && firstLoad" class="overflow-x-auto">
+          <DataTable :value="skeletonData" class="p-datatable-sm" responsiveLayout="scroll">
             <Column field="date" header="Дата">
               <template #body>
                 <Skeleton height="1.5rem" class="mb-2" />
@@ -193,10 +144,7 @@
         </div>
 
         <!-- Сообщение об отсутствии данных -->
-        <div
-          v-if="!loading && cases.length === 0 && !firstLoad"
-          class="text-center py-8"
-        >
+        <div v-if="!loading && cases.length === 0 && !firstLoad" class="text-center py-8">
           <i class="pi pi-search text-4xl text-gray-400 mb-4"></i>
           <p class="text-gray-500">Нет доступных данных по судебным делам</p>
           <p class="text-sm text-gray-400 mt-2">
@@ -207,24 +155,15 @@
     </Card>
 
     <!-- Диалог с хронологией дела -->
-    <Dialog
-      v-model:visible="timelineDialogVisible"
-      :header="`Хронология дела ${
-        selectedCase ? selectedCase.case_number : ''
-      }`"
-      :style="{ width: '90vw', maxWidth: '1000px' }"
-      :modal="true"
-      :closable="true"
-    >
+    <Dialog v-model:visible="timelineDialogVisible" :header="`Хронология дела ${selectedCase ? selectedCase.case_number : ''
+      }`" :style="{ width: '90vw', maxWidth: '1000px' }" :modal="true" :closable="true">
       <div v-if="selectedCase && selectedCase.case_details">
         <Timeline :value="timelineEvents" class="w-full">
           <template #marker="slotProps">
             <i :class="getTimelineIcon(slotProps.item.type)"></i>
           </template>
           <template #content="slotProps">
-            <div
-              class="p-3 border border-gray-200 rounded-md shadow-sm mb-3 bg-white"
-            >
+            <div class="p-3 border border-gray-200 rounded-md shadow-sm mb-3 bg-white">
               <div class="flex justify-between mb-2">
                 <span class="font-semibold text-lg">{{
                   slotProps.item.result
@@ -236,34 +175,21 @@
               <div class="flex flex-col">
                 <div class="flex items-start mb-1">
                   <span class="font-medium text-gray-700 mr-2">Тип:</span>
-                  <span
-                    class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-sm"
-                  >
+                  <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-sm">
                     {{ slotProps.item.type }}
                   </span>
                 </div>
-                <div
-                  class="flex items-start mb-1"
-                  v-if="slotProps.item.subject"
-                >
+                <div class="flex items-start mb-1" v-if="slotProps.item.subject">
                   <span class="font-medium text-gray-700 mr-2">Субъект:</span>
                   <span>{{ slotProps.item.subject }}</span>
                 </div>
-                <div
-                  class="flex items-start mb-1"
-                  v-if="slotProps.item.additional_info"
-                >
-                  <span class="font-medium text-gray-700 mr-2"
-                    >Дополнительно:</span
-                  >
+                <div class="flex items-start mb-1" v-if="slotProps.item.additional_info">
+                  <span class="font-medium text-gray-700 mr-2">Дополнительно:</span>
                   <span>{{ slotProps.item.additional_info }}</span>
                 </div>
                 <div v-if="slotProps.item.file_link">
-                  <a
-                    :href="slotProps.item.file_link"
-                    target="_blank"
-                    class="inline-flex items-center mt-2 text-blue-600 hover:text-blue-800 hover:underline"
-                  >
+                  <a :href="slotProps.item.file_link" target="_blank"
+                    class="inline-flex items-center mt-2 text-blue-600 hover:text-blue-800 hover:underline">
                     <i class="pi pi-file-pdf mr-1"></i>
                     <span>Просмотреть документ</span>
                   </a>
@@ -282,10 +208,8 @@ import { useToast } from "primevue/usetoast";
 import { computed, onMounted, ref, watch } from "vue";
 import bitrixService from "../services/bitrixService.js";
 import { fetchArbitrationCases } from "../services/kad-api";
+import { useAuthStore } from '@payment-app/authSdk'
 
-const dailyLimit = ref(10);
-const usedClicks = ref(0);
-const remainingClicks = ref(10);
 
 const toast = useToast();
 const loading = ref(false);
@@ -294,6 +218,7 @@ const firstLoad = ref(true);
 const skeletonData = Array(5).fill({});
 const timelineDialogVisible = ref(false);
 const selectedCase = ref(null);
+const authStore = useAuthStore();
 
 // Параметры поиска
 const searchParams = ref({
@@ -322,10 +247,10 @@ const formatDate = (dateString) => {
     return isNaN(date.getTime())
       ? dateString
       : date.toLocaleDateString("ru-RU", {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-        });
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
   }
 };
 
@@ -374,43 +299,6 @@ watch(
 var fetch_data;
 // Функция получения данных из API по номеру дела
 const fetchData = async () => {
-  try {
-    // 1. Проверяем лимит перед запросом
-    const initialClick = await bitrixService.addClick();
-    console.log("Результат добавления клика:", initialClick);
-
-    if (initialClick.isLimitReached) {
-      toast.add({
-        severity: "warn",
-        summary: "Лимит",
-        detail: initialClick.message,
-        life: 5000,
-      });
-      loading.value = false;
-      return;
-    }
-
-    // 2. Обновляем UI
-    dailyLimit.value = initialClick.limit;
-    usedClicks.value = initialClick.count;
-    remainingClicks.value = initialClick.limit - initialClick.count;
-
-    toast.add({
-      severity: "success",
-      summary: "Успешно",
-      detail: initialClick.message,
-      life: 3000,
-    });
-  } catch (error) {
-    console.error("Ошибка при получении данных:", error);
-    toast.add({
-      severity: "error",
-      summary: "Ошибка",
-      detail: "Ошибка при получении данных из КАД",
-      life: 3000,
-    });
-  }
-  console.log("fetchData: Начало запроса с параметрами", searchParams.value);
   loading.value = true;
   firstLoad.value = false;
   cases.value = [];
@@ -422,24 +310,30 @@ const fetchData = async () => {
       detail: "Введите номер дела для поиска",
       life: 3000,
     });
-    console.log("fetchData: Номер дела не введён");
     loading.value = false;
     return;
   }
 
   try {
+    const clickAvalible = await authStore.isActionAvailable({ key: 'numberSearch.count' })
+    if (!clickAvalible.available) {
+      toast.add({
+        severity: "warn",
+        summary: "Лимит превышен",
+        detail: clickAvalible.message,
+        life: 5000,
+      });
+      loading.value = false;
+      return;
+    }
+
     const result = await fetchArbitrationCases({
       type: "byId",
       caseNumber: searchParams.value.caseNumber,
       includeTimeline: searchParams.value.includeTimeline,
     });
     fetch_data = result;
-    console.log("fetchData: Получен результат", result);
-
-    // ПРИМЕР 1: если точно знаете, что result — это массив
     cases.value = result;
-    console.log("fetchData: cases.value", cases.value);
-
     if (cases.value.length === 0) {
       toast.add({
         severity: "info",
@@ -452,10 +346,9 @@ const fetchData = async () => {
       toast.add({
         severity: "success",
         summary: "Успешно",
-        detail: `Найдено дел: ${cases.value.length}`,
+        detail: `За месяц поиск выполнен: ${clickAvalible.newUsed} из ${clickAvalible.limit} доступных раз`,
         life: 3000,
       });
-      console.log("fetchData: Найдено дел:", cases.value.length);
     }
   } catch (error) {
     console.error("fetchData: Ошибка при получении данных:", error);
@@ -490,21 +383,6 @@ var mapping = {
 const syncWithBitrix = async () => {
   loading.value = true;
   try {
-    // Сначала проверяем подписку
-    const subscriptionInfo = await bitrixService.checkSubscription();
-    if (!subscriptionInfo.subscribed) {
-      toast.add({
-        severity: "warn",
-        summary: "Ограничение доступа",
-        detail:
-          "Синхронизация с Битрикс доступна только при активной подписке. Оформите подписку для использования этой функции во вкладке Тарифы.",
-        life: 5000,
-        escape: false,
-      });
-      loading.value = false;
-      return;
-    }
-
     const placementInfoResult = await bitrixService.placementInfo();
     console.log("Результат placementInfo():", placementInfoResult);
 
@@ -567,7 +445,7 @@ const syncWithBitrix = async () => {
 onMounted(async () => {
   console.log("Компонент загружен");
 
-   try {
+  try {
     // Получаем информацию о размещении
     const placementInfoResult = await bitrixService.placementInfo();
 
@@ -627,6 +505,7 @@ onMounted(async () => {
 .items-center {
   align-items: unset;
 }
+
 :deep(.p-datatable-wrapper) {
   border-radius: 0.5rem;
   overflow: hidden;

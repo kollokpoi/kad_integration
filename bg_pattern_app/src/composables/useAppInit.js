@@ -1,6 +1,7 @@
 // composables/useAppInit.js
 import { ref } from 'vue'
 import { B24AuthSDK, useAuthStore } from '@payment-app/authSdk'
+import bitrixService from '../services/bitrixService'
 
 export function useAppInit() {
   const authStore = useAuthStore()
@@ -8,24 +9,29 @@ export function useAppInit() {
   const error = ref(null)
 
   const initialize = async () => {
-    if (authStore.isInitialized) return
     
+    if (!bitrixService.isInitialized)
+      await bitrixService.init()
+    if (authStore.isInitialized) return
+
+
     isLoading.value = true
     error.value = null
-
     try {
       const sdk = new B24AuthSDK({
         baseURL: import.meta.env.VITE_API_URL,
-        appId: import.meta.env.VITE_APP_ID
+        appId: import.meta.env.VITE_APP_ID,
+        auth: bitrixService.appData.auth
       })
 
+      console.log(bitrixService.appData.auth)
       const store = await sdk.createStore()
 
       if (!store.isAuthenticated) {
         const result = await store.login()
         if (!result.success) {
           const registerResult = await store.register();
-          if(!registerResult.success){
+          if (!registerResult.success) {
             throw new Error(registerResult.message || 'Ошибка авторизации')
           }
         }

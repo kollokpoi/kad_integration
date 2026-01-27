@@ -4,7 +4,7 @@ export class ApplicationService {
   }
 
   async get(id) {
-    const response = await this.api.get(`/api/applications/${id}`);
+    const response = await this.api.get(`/api/application/${id}`);
     return response;
   }
 }

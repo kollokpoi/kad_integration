@@ -1,44 +1,86 @@
 <?php
 class KADSyncService
 {
-    private $authService;
     private $portalModel;
+    private $subscriptionModel;
     private $tokenModel;
+    private $defaultSettings = [
+        'last_sync' => null,
+        'global_settings' => false,
+        'frequency_days' => 7,
+        'save_to_chat' => false,
+        'save_to_timeline' => true
+    ];
 
     public function __construct()
     {
-        $this->authService = new BitrixAuthService();
         $this->portalModel = new Portal();
-        $this->tokenModel = new Token();
+        $this->subscriptionModel = new Subscription();
     }
 
     /**
      * Синхронизация одного портала
      */
-    public function syncPortal($portal)
+    public function syncSubscription($subscription): void
     {
-        $domain = $portal['portal_domain'];
-        $settings = json_decode($portal['settings'], true);
+        $subscriptionId = $subscription['id'];
+        $domain = $subscription['portal']['b24Domain'];
+        $metadata = [];
+        if (isset($subscription['metadata']) && !empty($subscription['metadata'])) {
+            if (is_string($subscription['metadata'])) {
+                $metadata = json_decode($subscription['metadata'], true);
+            } elseif (is_array($subscription['metadata'])) {
+                $metadata = $subscription['metadata'];
+            }
+        }
 
-        $this->log("Начинаю синхронизацию портала: {$domain}");
+        if (empty($metadata['sync_settings'])) {
+            $this->log("Нет настроек синхронизации, использую дефолтные");
+            $metadata['sync_settings'] = $this->defaultSettings;
+            $this->subscriptionModel->updateSettings($subscriptionId, $this->defaultSettings);
+        }
+
+        $settings = $metadata['sync_settings'];
+
+        $this->log("Начинаю синхронизацию подписки: {$domain} {$subscriptionId}");
 
         try {
-            $accessToken = $this->authService->getValidAccessToken($domain);
+            $this->log('/api/subscription/' . $subscriptionId . '/getToken');
+            $tokens = $this->subscriptionModel->getValidToken($subscriptionId);
+
+            if (empty($tokens) || empty($tokens['access_token'])) {
+                $this->log("Отсутсвует токен. Пропускаю: ");
+                return;
+            }
+            $accessToken = $tokens['access_token'];
 
             $entities = $this->getEntitiesToSync($domain, $accessToken);
-
             if (empty($entities)) {
                 $this->log("Нет сущностей для синхронизации");
-                $this->updateLastSyncTime($domain);
+                $settings['last_sync'] = date('Y-m-d H:i:s');
+                $this->subscriptionModel->updateSettings($subscriptionId, $settings);
                 return;
             }
 
             $this->log("Найдено сущностей для синхронизации: " . count($entities));
 
+
+            $tariff = $subscription['tariff'];
+            $limits = $tariff['limits'];
+            $maxToSync = null;
+
+            if (!empty($limits) && !empty($limits['maxToSync'])) {
+                $maxToSync = intval($limits['maxToSync']);
+                $this->log("Найдено ограничение на синхронизацию: " . $maxToSync);
+            }
+
             $processed = 0;
             foreach ($entities as $entity) {
                 $this->processEntity($domain, $accessToken, $entity, $settings);
                 $processed++;
+
+                if (isset($maxToSync) && $processed >= $maxToSync)
+                    break;
 
                 if ($processed % 5 === 0) {
                     sleep(1);
@@ -46,7 +88,8 @@ class KADSyncService
             }
 
             if ($settings['global_settings']) {
-                $this->updateLastSyncTime($domain);
+                $settings['last_sync'] = date('Y-m-d H:i:s');
+                $this->subscriptionModel->updateSettings($subscriptionId, $settings);
             }
 
             $this->log("Синхронизация завершена. Обработано: {$processed} сущностей");
@@ -121,10 +164,10 @@ class KADSyncService
         if (!empty($entitySyncFrequency) && $entitySyncFrequency >= 0) {
             $syncFrequency = (int)$entitySyncFrequency;
             $this->log("Частота из сущности: {$syncFrequency} дней");
-        } else{
+        } else {
             $syncFrequency = (int)($settings['frequency_days'] ?? 7);
             $this->log("Частота из глобальных: {$syncFrequency} дней");
-        } 
+        }
         $this->log("entityLastSync{$entityLastSync}");
         $lastSync = null;
 
@@ -478,27 +521,6 @@ class KADSyncService
             $this->log("Исключение при обновлении времени синхронизации: " . $e->getMessage());
             return false;
         }
-    }
-
-    /**
-     * Обновляет время последней синхронизации портала
-     */
-    private function updateLastSyncTime($domain)
-    {
-        $portalModel = new Portal();
-        $portal = $portalModel->getByDomain($domain);
-
-        if (!$portal) {
-            $this->log("Портал {$domain} не найден для обновления времени синхронизации");
-            return;
-        }
-
-        $settings = json_decode($portal['settings'], true);
-        $settings['last_sync'] = date('Y-m-d H:i:s');
-
-        $portalModel->updateSettings($domain, $settings);
-
-        $this->log("Время последней синхронизации обновлено для портала {$domain}");
     }
 
     /**

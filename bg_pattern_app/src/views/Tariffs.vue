@@ -63,66 +63,45 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <div v-for="(plan, index) in plans" :key="plan.name" class="relative group"
           :class="{ 'lg:-mt-4': plan.popular }">
-          <Card class="transition-all duration-300 h-full overflow-hidden border" :class="[
+          <div class="transition-all duration-300 h-full overflow-hidden border flex flex-col" :class="[
             'shadow-md border-gray-200 hover:shadow-xl',
             'group-hover:transform group-hover:scale-[1.02]',
           ]">
-            <template #header>
-              <div class="p-4 border-b bg-gray-50" :class="{ 'bg-primary bg-opacity-5': plan.popular }">
-                <div class="flex flex-col items-center text-center">
-                  <h3 class="text-2xl font-bold text-gray-800">
-                    {{ plan.name }}
-                  </h3>
-                  <div class="flex items-baseline mt-2">
-                    <span class="text-3xl font-bold text-primary">{{
-                      plan.price
-                    }}</span>
-                    <span class="text-lg text-gray-600 ml-1">₽/мес</span>
-                  </div>
-                  <p class="text-sm text-gray-500 mt-1" :class="{ 'text-white': plan.popular }">
-                    {{ plan.description }}
-                  </p>
+            <div class="p-4 border-b bg-gray-50">
+              <div class="flex flex-col items-center text-center">
+                <h3 class="text-2xl font-bold text-gray-800">
+                  {{ plan.name }}
+                </h3>
+                <div class="flex items-baseline mt-2">
+                  <span class="text-3xl font-bold text-primary">{{
+                    plan.price
+                  }}</span>
+                  <span class="text-lg text-gray-600 ml-1">₽/{{ getPeriodLabel(plan.period) }}</span>
                 </div>
+                <p class="text-sm text-gray-500 mt-1" :class="{ 'text-white': plan.popular }">
+                  {{ plan.description }}
+                </p>
               </div>
-            </template>
-
-            <template #content>
-              <div class="p-4">
-                <ul class="space-y-3 mb-8">
-                  <li v-for="(feature, idx) in plan.features" :key="idx" class="flex items-start gap-3">
-                    <i class="pi pi-check-circle mt-1 text-primary"></i>
-                    <span class="text-gray-700">{{ feature }}</span>
-                  </li>
-                </ul>
-              </div>
-            </template>
-
-            <template #footer>
-              <div class="p-4 pt-0">
-                <Button v-if="
-                  authStore.currentTariff &&
-                  authStore.currentTariff.id === plan.id
-                " class="w-full" outlined="" label="Текущий" />
-                <Button v-else class="w-full" label="Выбрать" @click="goToActivatePortal(plan)" />
-                <div class="flex justify-center gap-4 mt-4">
-                  <a @click.stop="contactTelegram(plan.name)"
-                    class="flex items-center text-gray-600 hover:text-primary cursor-pointer">
-                    <i class="pi pi-send mr-1"></i>
-                    <span class="text-sm">Telegram</span>
-                  </a>
-
-                  <a @click.stop="contactEmail(plan.name)"
-                    class="flex items-center text-gray-600 hover:text-primary cursor-pointer">
-                    <i class="pi pi-envelope mr-1"></i>
-                    <span class="text-sm">Email</span>
-                  </a>
-                </div>
-              </div>
-            </template>
-          </Card>
+            </div>
+            <div class="p-4 flex-1">
+              <ul class="space-y-3 mb-8">
+                <li v-for="(feature, idx) in plan.features" :key="idx" class="flex items-start gap-3">
+                  <i class="pi pi-check-circle mt-1 text-primary"></i>
+                  <span class="text-gray-700">{{ feature }}</span>
+                </li>
+              </ul>
+            </div>
+            <div class="p-4 mt-auto">
+              <Button v-if="
+                authStore.currentTariff &&
+                authStore.currentTariff.id === plan.id
+              " class="w-full" outlined="" label="Текущий" />
+              <Button v-else class="w-full" label="Выбрать" @click="goToTelegram(plan)" />
+            </div>
+          </div>
         </div>
       </div>
       <div class="mt-16 text-center">
@@ -160,7 +139,8 @@ const loadTariffs = async () => {
       import.meta.env.VITE_APP_ID,
     );
     if (response.success) {
-      plans.value = response.data;
+      plans.value = response.data.filter(x => x.showInList);
+      plans.value.sort((a, b) => a.sortOrder - b.sortOrder)
     } else {
       showError(toast, `Ошибка загрузки тарифов`);
     }
@@ -169,21 +149,35 @@ const loadTariffs = async () => {
   }
 }
 
+const goToTelegram = (plan) => {
+  const userData = {
+    domain: authStore.domain,
+    tariff: plan.name,
+    application:authStore.application.name, 
+  };
+
+  const message = `
+*Домен портала:* ${userData.domain}
+*Приложение:* ${userData.application}
+*Тариф:* ${userData.tariff}
+
+  `.trim();
+
+  const encodedMessage = encodeURIComponent(message);
+  window.open(`https://t.me/bg_1812?text=${encodedMessage}`, '_blank');
+}
+
 onMounted(async () => {
   await loadTariffs();
 });
 
-const contactTelegram = () => {
-  BX24.init(() => {
-    window.open("https://t.me/Background59_bot", "_blank");
-  });
-};
-
-const contactEmail = (planName) => {
-  const subject = encodeURIComponent(`Покупка тарифа: ${planName}`);
-  const body = encodeURIComponent(
-    "Здравствуйте! Интересует подробная информация по тарифу...",
-  );
-  window.location.href = `mailto:it@bg59.ru?subject=${subject}&body=${body}`;
-};
+const getPeriodLabel = (period) => {
+  const periodLabels = {
+    day: 'день',
+    week: 'неделя',
+    month: 'месяц',
+    year: 'год'
+  }
+  return periodLabels[period] || period
+}
 </script>

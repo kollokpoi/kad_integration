@@ -1,6 +1,5 @@
 <template>
   <div class="p-6">
-    <Toast position="top-right" />
     <PageHeader>
       <template #title>Детальный просмотр дела</template>
       <template #subtitle>Номер дела: {{ caseNumber }}</template>

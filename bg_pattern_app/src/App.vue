@@ -16,6 +16,7 @@
       </template>
     </Suspense>
   </AppErrorBoundary>
+  <Toast position="top-right" />
 </template>
 
 <script setup>
@@ -24,6 +25,7 @@ import { RouterView } from 'vue-router'
 import ProgressSpinner from 'primevue/progressspinner'
 import AppErrorBoundary from './components/AppErrorBoundary.vue'
 import AppInitializer from './components/AppInitializer.vue'
+import { Toast } from 'primevue'
 </script>
 
 <style>

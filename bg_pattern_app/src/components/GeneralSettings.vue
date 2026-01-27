@@ -9,66 +9,39 @@
       </p>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div
-          v-for="entity in entities"
-          :key="entity.id"
-          class="border border-gray-200 rounded-lg p-4 transition-all hover:shadow-md"
-        >
+        <div v-for="entity in entities" :key="entity.id"
+          class="border border-gray-200 rounded-lg p-4 transition-all hover:shadow-md">
           <div class="flex items-center justify-between">
             <div class="flex items-center">
-              <Avatar
-                :icon="entity.icon"
-                :style="{ backgroundColor: entity.color }"
-                size="large"
-                class="mr-3"
-              />
+              <Avatar :icon="entity.icon" :style="{ backgroundColor: entity.color }" size="large" class="mr-3" />
               <div>
                 <h4 class="font-medium text-gray-800">{{ entity.name }}</h4>
                 <p class="text-sm text-gray-500">{{ entity.description }}</p>
               </div>
             </div>
-            <Checkbox
-              v-model="entity.enabled"
-              :binary="true"
-              @change="emitChange"
-            />
+            <Checkbox v-model="entity.enabled" :binary="true" :disabled="!authStore.canSyncEntity(entity.id)"
+              @change="emitChange" />
           </div>
         </div>
       </div>
     </div>
 
+    <p class="text-gray-600 mb-4">
+      По вашему тарифу доступны: {{ availableEntitiesNames }}
+    </p>
+
     <div class="flex gap-4 justify-end">
       <Button label="Отмена" text @click="resetSettings" />
-      <Button
-        label="Сохранить настройки"
-        icon="pi pi-save"
-        severity="success"
-        class="btn-main"
-        @click="saveSettings"
-        :loading="saving"
-      />
+      <Button label="Сохранить настройки" icon="pi pi-save" severity="success" class="btn-main" @click="saveSettings"
+        :loading="saving" />
     </div>
 
-    <Dialog
-      v-model:visible="showConnectionDialog"
-      header="Подключение к Битрикс24"
-      :modal="true"
-      :closable="false"
-      :style="{ width: '450px' }"
-    >
+    <Dialog v-model:visible="showConnectionDialog" header="Подключение к Битрикс24" :modal="true" :closable="false"
+      :style="{ width: '450px' }">
       <div class="flex flex-col items-center p-4">
-        <i
-          class="pi pi-spin pi-spinner text-4xl text-primary mb-4"
-          v-if="connecting"
-        ></i>
-        <i
-          class="pi pi-check-circle text-4xl text-green-500 mb-4"
-          v-else-if="connected"
-        ></i>
-        <i
-          class="pi pi-exclamation-circle text-4xl text-amber-500 mb-4"
-          v-else
-        ></i>
+        <i class="pi pi-spin pi-spinner text-4xl text-primary mb-4" v-if="connecting"></i>
+        <i class="pi pi-check-circle text-4xl text-green-500 mb-4" v-else-if="connected"></i>
+        <i class="pi pi-exclamation-circle text-4xl text-amber-500 mb-4" v-else></i>
 
         <h3 class="text-lg font-semibold text-gray-800 mb-2">
           {{ connectionStatus.title }}
@@ -79,19 +52,9 @@
       </div>
 
       <template #footer>
-        <Button
-          label="Закрыть"
-          text
-          @click="showConnectionDialog = false"
-          :disabled="connecting"
-        />
-        <Button
-          v-if="!connected"
-          label="Повторить"
-          icon="pi pi-refresh"
-          @click="connectToBitrix24"
-          :disabled="connecting"
-        />
+        <Button label="Закрыть" text @click="showConnectionDialog = false" :disabled="connecting" />
+        <Button v-if="!connected" label="Повторить" icon="pi pi-refresh" @click="connectToBitrix24"
+          :disabled="connecting" />
       </template>
     </Dialog>
 
@@ -102,18 +65,26 @@
 import { useToast } from "primevue/usetoast";
 import { computed, onMounted, reactive, ref } from "vue";
 import bitrixService from "../services/bitrixService.js";
+import { useAuthStore } from '@payment-app/authSdk'
 
-// Эмиты для родительского компонента
+const authStore = useAuthStore()
 const emit = defineEmits(["change"]);
-
 const toast = useToast();
 
-// Функция для отправки события изменения родительскому компоненту
+
+const availableEntitiesNames = computed(() => {
+  const availableEntities = authStore.availableEntities
+  const names = availableEntities.map((item) => {
+    const entity = entities.find(x => x.id == item);
+    return entity ? entity.name : item
+  })
+  return names.join(',')
+})
+
 const emitChange = () => {
   emit("change");
 };
 
-// Сущности Битрикс24
 const entities = reactive([
   {
     id: "leads",
@@ -149,17 +120,14 @@ const entities = reactive([
   },
 ]);
 
-// Настройки приложения
 const settings = reactive({
   refreshInterval: 15,
   displayMode: "detailed",
   notifications: true,
 });
 
-// Состояние для сохранения настроек
 const saving = ref(false);
 
-// Состояние подключения к Битрикс24
 const showConnectionDialog = ref(false);
 const connecting = ref(false);
 const connected = ref(false);
@@ -184,7 +152,6 @@ const connectionStatus = computed(() => {
   }
 });
 
-// Функция для отображения уведомлений с учетом настроек
 const showNotification = (severity, summary, detail, life = 3000) => {
   toast.add({
     severity,
@@ -199,15 +166,13 @@ const saveSettings = async () => {
   try {
     saving.value = true;
 
-    // Собираем выбранные и невыбранные сущности
     const selectedEntities = entities
-      .filter((entity) => entity.enabled)
+      .filter((entity) => entity.enabled && authStore.canSyncEntity(entity.id))
       .map((entity) => entity.id);
     const unselectedEntities = entities
       .filter((entity) => !entity.enabled)
       .map((entity) => entity.id);
 
-    // Если выбраны сущности, а подключение к Bitrix24 отсутствует – пытаемся подключиться
     if (selectedEntities.length > 0 && !connected.value) {
       showConnectionDialog.value = true;
       await connectToBitrix24();
@@ -221,7 +186,6 @@ const saveSettings = async () => {
       }
     }
 
-    // Если подключение установлено и есть выбранные сущности – вызываем привязку
     if (selectedEntities.length > 0 && connected.value) {
       const bindResult =
         await bitrixService.connectToEntities(selectedEntities);
