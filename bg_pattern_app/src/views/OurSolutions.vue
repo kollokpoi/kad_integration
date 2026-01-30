@@ -64,7 +64,7 @@
 
         <div
           v-if="filteredSolutions.length"
-          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-6">
           <div
             v-for="solution in filteredSolutions"
             :key="solution.id"

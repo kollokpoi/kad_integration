@@ -2,9 +2,7 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-require_once __DIR__ . '/models/Portal.php';
 require_once __DIR__ . '/models/Subscription.php';
-require_once __DIR__ . '/services/BitrixAuthService.php';
 require_once __DIR__ . '/services/ApiService.php';
 require_once __DIR__ . '/KADSyncService.php';
 
@@ -12,17 +10,12 @@ class OneTimeSync
 {
     private $syncService;
 
-    public function __construct()
-    {
-        $this->syncService = new KADSyncService();
-    }
 
     public function run()
     {
         $this->log("=== Запуск синхронизации " . date('Y-m-d H:i:s') . " ===");
 
-        $subscriptionModel = new Subscription();
-        $subscriptions = $subscriptionModel->getAllActive();
+        $subscriptions = Subscription::getAllActive();
 
         if (empty($subscriptions)) {
             $this->log("Нет активных подписок для синхронизации");
@@ -33,8 +26,11 @@ class OneTimeSync
 
         foreach ($subscriptions as $subscription) {
             try {
-                $this->log("Обработка подписки портала: {$subscription['portal']['b24Domain']}");
-                $this->syncService->syncSubscription($subscription);
+                if ($subscription['portal']['b24Domain'] == "b24-tqrxe2.bitrix24.ru") {
+                    $this->log("Обработка подписки портала: {$subscription['portal']['b24Domain']}");
+                    $syncService = new KADSyncService($subscription);
+                    $syncService->syncSubscription();
+                }
             } catch (Exception $e) {
                 $this->log("Ошибка подписки портала {$subscription['portal']['b24Domain']}: " . $e->getMessage());
             }

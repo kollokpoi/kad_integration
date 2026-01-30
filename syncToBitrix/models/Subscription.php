@@ -2,16 +2,21 @@
 class Subscription
 {
     private $api;
+    private $token;
 
-    public function __construct()
+    private $subscriptionData;
+
+    public function __construct($data)
     {
         $this->api = Api::getInstance();
+        $this->subscriptionData = $data;
+        $this->getValidToken();
     }
 
 
-    public function getAllActive()
+    public static function getAllActive()
     {
-        $response = $this->api->get('/api/subscription/getAll');
+        $response = Api::getInstance()->get('/api/subscription/getAll');
 
         if ($response['status'] !== 200) {
             throw new Exception('HTTP ошибка: ' . $response['status']);
@@ -32,9 +37,9 @@ class Subscription
         return $response['data'];
     }
 
-    public function getValidToken($subscriptionId)
+    private function getValidToken()
     {
-        $response = $this->api->get('/api/subscription/' . $subscriptionId . '/getToken');
+        $response = $this->api->get('/api/subscription/' . $this->getId() . '/getToken');
 
         if ($response['status'] !== 200) {
             throw new Exception('HTTP ошибка: ' . $response['status']);
@@ -50,13 +55,20 @@ class Subscription
         }
 
         if (isset($response['data']['data']) && is_array($response['data']['data'])) {
-            return $response['data']['data'];
+            $tokens = $response['data']['data'];
+            if (empty($tokens) || empty($tokens['access_token'])) {
+                return;
+            }
+            $this->token = $tokens['access_token'];
         }
-
-        return $response['data'];
+        $tokens = $response['data'];
+        if (empty($tokens) || empty($tokens['access_token'])) {
+            return;
+        }
+        $this->token = $tokens['access_token'];
     }
 
-    public function updateSettings($subscriptionId, array $settings): array
+    public function updateSettings(array $settings): array
     {
         // Подготавливаем данные для отправки
         $requestData = [
@@ -65,8 +77,9 @@ class Subscription
             ]
         ];
 
+
         $response = $this->api->post(
-            '/api/subscription/' . $subscriptionId . '/update',
+            '/api/subscription/' . $this->getId() . '/update',
             $requestData
         );
 
@@ -81,5 +94,42 @@ class Subscription
         }
 
         return $data['data'] ?? [];
+    }
+
+    public function getId()
+    {
+        return $this->subscriptionData['id'];
+    }
+    public function getDomain()
+    {
+        return $this->subscriptionData['portal']['b24Domain'];
+    }
+    public function getMetadata()
+    {
+        $metadata = [];
+        if (isset($this->subscriptionData['metadata']) && !empty($this->subscriptionData['metadata'])) {
+            if (is_string($this->subscriptionData['metadata'])) {
+                $metadata = json_decode($this->subscriptionData['metadata'], true);
+            } elseif (is_array($this->subscriptionData['metadata'])) {
+                $metadata = $this->subscriptionData['metadata'];
+            }
+        }
+        return $metadata;
+    }
+    public function getToken()
+    {
+        return $this->token;
+    }
+    
+    public function getMaxToSync()
+    {
+        $tariff = $this->subscriptionData['tariff'];
+        $limits = $tariff['limits'];
+        $maxToSync = null;
+
+        if (!empty($limits) && !empty($limits['maxToSync'])) {
+            $maxToSync = intval($limits['maxToSync']);
+        }
+        return $maxToSync;
     }
 }

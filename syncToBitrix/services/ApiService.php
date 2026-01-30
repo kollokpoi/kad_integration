@@ -6,7 +6,6 @@ class Api {
     private $headers = [];
     private $accessToken = null;
     
-
     private function __construct() {
         $this->config = [
             'baseUrl' => 'appsapi.bgdev.site',

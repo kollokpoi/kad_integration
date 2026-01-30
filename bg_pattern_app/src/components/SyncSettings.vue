@@ -32,6 +32,11 @@
         </label>
 
         <label class="block text-sm font-medium mb-2">
+          добавлять заседания в календарь:
+          <Checkbox v-model="settings.save_to_calendar" :binary="true" class="ml-2" />
+        </label>
+
+        <label class="block text-sm font-medium mb-2">
           Последняя синхронизация: {{ settings.last_sync }}
         </label>
       </div>
@@ -88,6 +93,7 @@ const settings = reactive({
   frequency_days: 7,
   save_to_chat: false,
   save_to_timeline: true,
+  save_to_calendar: false,
 });
 
 const saving = ref(false);
@@ -133,6 +139,7 @@ const saveSettings = async () => {
       frequency_days: settings.frequency_days,
       save_to_chat: settings.save_to_chat,
       save_to_timeline: settings.save_to_timeline,
+      save_to_calendar: settings.save_to_calendar
     };
     const response = await authStore.updateMetadata({ sync_settings })
     if (response.success) {
@@ -183,6 +190,8 @@ const resetSettings = async () => {
   settings.frequency_days = 7;
   settings.save_to_chat = false;
   settings.save_to_timeline = true;
+  settings.save_to_calendar = false;
+
   showNotification(
     "info",
     "Сброс",

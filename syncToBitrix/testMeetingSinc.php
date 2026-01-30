@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/models/Subscription.php';
+require_once __DIR__ . '/services/ApiService.php';
 class KADSyncService
 {
     private $subscriptionModel;
@@ -12,24 +14,32 @@ class KADSyncService
         'save_to_calendar' => false,
     ];
 
-    public function __construct($subscription)
+    public function __construct()
     {
-        $this->subscriptionModel = new Subscription($subscription);
+        $this->subscriptionModel = new Subscription();
     }
 
     /**
      * Синхронизация одного портала
      */
-    public function syncSubscription(): void
+    public function syncSubscription($subscription): void
     {
+        $subscriptionId = $subscription['id'];
+        $domain = $subscription['portal']['b24Domain'];
+        $metadata = [];
 
-        $metadata = $this->subscriptionModel->getMetadata();
-        $subscriptionId = $this->subscriptionModel->getId();
-        $domain = $this->subscriptionModel->getDomain();
+        if (isset($subscription['metadata']) && !empty($subscription['metadata'])) {
+            if (is_string($subscription['metadata'])) {
+                $metadata = json_decode($subscription['metadata'], true);
+            } elseif (is_array($subscription['metadata'])) {
+                $metadata = $subscription['metadata'];
+            }
+        }
+
         if (empty($metadata['sync_settings'])) {
             $this->log("Нет настроек синхронизации, использую дефолтные");
             $metadata['sync_settings'] = $this->defaultSettings;
-            $this->subscriptionModel->updateSettings($this->defaultSettings);
+            $this->subscriptionModel->updateSettings($subscriptionId, $this->defaultSettings);
         }
 
         $settings = $metadata['sync_settings'];
@@ -38,10 +48,18 @@ class KADSyncService
 
         try {
             $this->log('/api/subscription/' . $subscriptionId . '/getToken');
-            $accessToken = $this->subscriptionModel->getToken();
-            if (empty($accessToken)) {
+            $tokens = $this->subscriptionModel->getValidToken($subscriptionId);
+
+            if (empty($tokens) || empty($tokens['access_token'])) {
                 $this->log("Отсутсвует токен. Пропускаю: ");
                 return;
+            }
+            $accessToken = $tokens['access_token'];
+
+            $availibleSkopesResponse = $this->makeBitrixRequestByHook('scope', []);
+            if (!empty($availibleSkopesResponse['result']) && is_array($availibleSkopesResponse['result'])) {
+                $this->availibleSkopes = $availibleSkopesResponse['result'];
+                $this->log("Доступные сущности: " . json_encode($this->availibleSkopes, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
             }
 
             if (!$this->hasScope('crm')) {
@@ -49,32 +67,40 @@ class KADSyncService
                 return;
             }
 
-            $entities = $this->getEntitiesToSync();
+            $entities = $this->getEntitiesToSync($domain, $accessToken);
             if (empty($entities)) {
                 $this->log("Нет сущностей для синхронизации");
                 $settings['last_sync'] = date('Y-m-d H:i:s');
-                $this->subscriptionModel->updateSettings($settings);
+                $this->subscriptionModel->updateSettings($subscriptionId, $settings);
                 return;
             }
 
             $this->log("Найдено сущностей для синхронизации: " . count($entities));
 
 
-            $maxToSync = $this->subscriptionModel->getMaxToSync();
+            $tariff = $subscription['tariff'];
+            $limits = $tariff['limits'];
+            $maxToSync = null;
+
+            if (!empty($limits) && !empty($limits['maxToSync'])) {
+                $maxToSync = intval($limits['maxToSync']);
+                $this->log("Найдено ограничение на синхронизацию: " . $maxToSync);
+            }
+
             $processed = 0;
             foreach ($entities as $entity) {
-                $this->processEntity($entity, $settings);
+                $this->processEntity($domain, $accessToken, $entity, $settings);
                 $processed++;
 
                 if (isset($maxToSync) && $processed >= $maxToSync)
                     break;
 
-                
+                sleep(60);
             }
 
             if ($settings['global_settings']) {
                 $settings['last_sync'] = date('Y-m-d H:i:s');
-                $this->subscriptionModel->updateSettings($settings);
+                $this->subscriptionModel->updateSettings($subscriptionId, $settings);
             }
 
             $this->log("Синхронизация завершена. Обработано: {$processed} сущностей");
@@ -87,14 +113,15 @@ class KADSyncService
     /**
      * Получает сущности для синхронизации
      */
-    private function getEntitiesToSync()
+    private function getEntitiesToSync($domain, $accessToken)
     {
         $entities = [];
         $entityTypes = ['lead', 'deal', 'contact', 'company'];
 
         foreach ($entityTypes as $entityType) {
             try {
-                $result = $this->makeBitrixRequest("crm.{$entityType}.list", [
+                $url = "https://{$domain}/rest/crm.{$entityType}.list";
+                $result = $this->makeBitrixRequest($url, $accessToken, [
                     'filter' => [
                         'UF_CRM_SHOULD_SYNC' => 1,
                     ],
@@ -130,7 +157,7 @@ class KADSyncService
     /**
      * Обрабатывает одну сущность
      */
-    private function processEntity($entity, $settings)
+    private function processEntity($domain, $accessToken, $entity, $settings)
     {
         $caseNumber = $entity['UF_CRM_NUMBER_CASE'] ?? null;
         $innNumber = $entity['UF_CRM_INN'] ?? null;
@@ -141,48 +168,14 @@ class KADSyncService
             return;
         }
 
-        $entitySyncFrequency = $entity['UF_CRM_SYNC_FREQUENCY'] ?? null;
-        $entityLastSync = $entity['UF_CRM_LAST_SYNC_DATE'] ?? null;
-        $entitySaveTo = $entity['UF_CRM_SAVETO_ENUM'] ?? null;
         $saveToCalendar = $settings['save_to_calendar'] ?? false;
         $this->log("Настройки сохранения в календарь: {$saveToCalendar}");
-
-        $syncFrequency = null;
-        if (!empty($entitySyncFrequency) && $entitySyncFrequency >= 0) {
-            $syncFrequency = (int)$entitySyncFrequency;
-            $this->log("Частота из сущности: {$syncFrequency} дней");
-        } else {
-            $syncFrequency = (int)($settings['frequency_days'] ?? 7);
-            $this->log("Частота из глобальных: {$syncFrequency} дней");
-        }
-        $this->log("entityLastSync{$entityLastSync}");
-        $lastSync = null;
-
-        if ($settings['global_settings']) {
-            if (!empty($entitySyncFrequency)) {
-                $lastSync = $entityLastSync;
-            } elseif (!empty($settings['last_sync'])) {
-                $lastSync = $settings['last_sync'];
-            }
-        } elseif (!empty($entityLastSync))
-            $lastSync = $entityLastSync;
-
-        if ($lastSync) {
-            $lastSyncTime = strtotime($lastSync);
-            $nextSyncTime = $lastSyncTime + ($syncFrequency * 86400);
-
-            if (time() < $nextSyncTime) {
-                $daysLeft = ceil(($nextSyncTime - time()) / 86400);
-                $this->log("Рано синхронизировать. Следующая через {$daysLeft} дней");
-                return;
-            }
-        }
 
         $saveToChat = false;
         $saveToTimeline = true;
 
         if (!empty($entitySaveTo)) {
-            if ($entitySaveTo == '50') {
+            if ($entitySaveTo == '55') {
                 $saveToChat = true;
                 $saveToTimeline = false;
             }
@@ -197,10 +190,9 @@ class KADSyncService
         }
 
         if (!$saveToChat && !$saveToTimeline) {
-            $this->log("Нет настроек для сохранения результатов");
-            return;
+            $this->log("Нет настроек для сохранения результатов/ сохраняю в таймлайн");
+            $saveToTimeline = true;
         }
-
         $entityType = $entity['ENTITY_TYPE'];
         $entityId = $entity['ID'];
 
@@ -222,17 +214,12 @@ class KADSyncService
                     if (!$this->hasScope('calendar')) {
                         $this->log("Нет доступа к календарю. Пропускаю синхронизацию событий");
                     } else {
-                        sleep(30);
                         $this->log("Поиск событий пользователя");
 
-                        $userMeetings = $this->makeBitrixRequest(
-                            'calendar.event.get',
-                            [
-                                "type" => "user",
-                                "ownerId" => $user
-                            ]
-                        )['result'];
-
+                        $userMeetings = $this->makeBitrixRequestByHook('calendar.event.get', [
+                            "type" => "user",
+                            "ownerId" => $user
+                        ])['result'];
                         $this->log("События пользователя: " . count($userMeetings));
 
                         $this->log("Поиск заседаний");
@@ -281,127 +268,44 @@ class KADSyncService
             } catch (Exception $e) {
                 $this->log("Ошибка поиска по номеру дела: " . $e->getMessage());
             }
+            // sleep(60);
         }
-
-        if (!empty($innNumber)) {
-            $this->log("Поиск по ИНН: {$innNumber}");
-            try {
-                $kadData = $this->fetchKADDataByINN($innNumber);
-
-                if (isset($kadData['results']) && !empty($kadData['results'])) {
-                    $foundCases = $kadData['results'];
-                    $this->log("Найдено дел по ИНН: " . count($foundCases));
-                }
-            } catch (Exception $e) {
-                $this->log("Ошибка поиска по ИНН: " . $e->getMessage());
-            }
-        }
-
         if (empty($foundCases)) {
             $this->log("Не найдено дел в КАД");
             return;
         }
 
         foreach ($foundCases as $case) {
-            $this->processSingleCase($entity, $case, [
+            $this->processSingleCase($domain, $accessToken, $entity, $case, [
                 'save_to_chat' => $saveToChat,
                 'save_to_timeline' => $saveToTimeline,
             ]);
         }
-        sleep(50);
     }
 
-    /**
-     * Получает данные по номеру дела
-     */
-    private function fetchKADDataByCaseNumber($caseNumber)
+    private function findExistingEvent($userMeetings, $caseNumber, $date)
     {
-        $apiUrl = 'https://bgdev.site/api/kad/getbyid';
+        // Генерируем тот же SYNC_ID
+        $dateHash = md5($date . $caseNumber);
+        $syncId = "KAD_{$dateHash}";
 
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $apiUrl,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode([
-                'case_number' => $caseNumber,
-                'include_timeline' => true
-            ]),
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'Accept: application/json'
-            ],
-            CURLOPT_TIMEOUT => 500,
-            CURLOPT_SSL_VERIFYPEER => false
-        ]);
+        foreach ($userMeetings as $meeting) {
+            // Ищем SYNC_ID в описании
+            if (strpos($meeting['DESCRIPTION'] ?? '', "SYNC_ID: {$syncId}") !== false) {
+                $this->log("Найдено соответствие c: " . $meeting['id'] ?? $meeting['ID']);
+                return $meeting;
+            }
 
-        $response = curl_exec($ch);
-
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        curl_close($ch);
-
-        if ($curlError) {
-            throw new Exception("CURL ошибка: {$curlError}");
+            // Или поиск по регулярке
+            if (preg_match('/SYNC_ID:\s*(KAD_[a-f0-9]{32})/', $meeting['DESCRIPTION'] ?? '', $matches)) {
+                if ($matches[1] === $syncId) {
+                    $this->log("Найдено соответствие c: " . $meeting['id'] ?? $meeting['ID']);
+                    return $meeting;
+                }
+            }
         }
 
-        if ($httpCode !== 200) {
-            throw new Exception("HTTP ошибка: {$httpCode}");
-        }
-
-        $data = json_decode($response, true);
-
-        if (isset($data['error'])) {
-            throw new Exception("API КАД: " . $data['error']);
-        }
-
-        return $data;
-    }
-
-    /**
-     * Получает данные по ИНН
-     */
-    private function fetchKADDataByINN($inn)
-    {
-        $apiUrl = 'https://bgdev.site/api/kad/getlistbyinn';
-
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $apiUrl,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode([
-                'inn' => $inn,
-                'include_timeline' => false
-            ]),
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'Accept: application/json'
-            ],
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_SSL_VERIFYPEER => false
-        ]);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        curl_close($ch);
-
-        if ($curlError) {
-            throw new Exception("CURL ошибка: {$curlError}");
-        }
-
-        if ($httpCode !== 200) {
-            throw new Exception("HTTP ошибка: {$httpCode}");
-        }
-
-        $data = json_decode($response, true);
-
-        if (isset($data['error'])) {
-            throw new Exception("API КАД: " . $data['error']);
-        }
-
-        return $data;
+        return null;
     }
 
     private function fetchMeetings($caseNumber)
@@ -444,23 +348,272 @@ class KADSyncService
 
         return $data;
     }
-    /**
-     * Обрабатывает одно найденное дело
-     */
-    private function processSingleCase($entity, $case, $saveSettings)
+
+    private function processSingleCase($domain, $accessToken, $entity, $case, $saveSettings)
     {
         $caseNumber = $case['case_number'] ?? null;
 
         try {
             $message = $this->formatCaseMessage($case, $entity);
 
-            $this->saveToBitrix($entity, $message, $saveSettings);
-
-            $this->updateEntityLastSync($entity);
+            $this->saveToBitrix($domain, $accessToken, $entity, $message, $saveSettings);
 
             $this->log("Успешно обработано дело {$caseNumber}");
         } catch (Exception $e) {
             $this->log("Ошибка обработки дела {$caseNumber}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Форматирует сообщение
+     */
+    private function formatCaseMessage($case, $entity)
+    {
+        $message = [
+            'title' => '',
+            'text' => '',
+            'link' => '',
+            'sync_id' => ''
+        ];
+        $message['title'] = "🔄 **Обновление из картотеки арбитражных дел**\n\n";
+
+        $message['text'] .= "📋 **Дело:** {$case['case_number']}\n";
+        $message['text'] .= "📅 **Дата регистрации:** {$case['date']}\n";
+        $message['text'] .= "⚖️ **Суд:** {$case['court']}\n";
+
+        if (!empty($case['judge'])) {
+            $message['text'] .= "👨‍⚖️ **Судья:** {$case['judge']}\n";
+        }
+
+        if (!empty($case['plaintiff'])) {
+            $message['text'] .= "👥 **Истец:** {$case['plaintiff']}\n";
+        }
+
+        if (!empty($case['respondent'])) {
+            $message['text'] .= "👥 **Ответчик:** {$case['respondent']}\n";
+        }
+
+        // Если есть детали дела
+        if (!empty($case['case_details']) && is_array($case['case_details'])) {
+            $message['text'] .= "\n📜 **Cобытия:**\n";
+            foreach ($case['case_details'] as $event) {
+                $message['text'] .= "• {$event['date']} - {$event['type']}";
+                if (!empty($event['result'])) {
+                    $message['text'] .= " ({$event['result']})";
+                }
+                $message['text'] .= "\n";
+            }
+        }
+
+        if (!empty($case['case_link'])) {
+            $message['link'] = $case['case_link'];
+        }
+
+        $message['text'] .= "\n⏰ **Обновлено:** " . date('d.m.Y H:i');
+        $dateHash = md5($case['case_number'] . $entity['ENTITY_TYPE'] . $entity['ID']);
+        $message['sync_id'] = "KAD_{$dateHash}";
+
+
+        return $message;
+    }
+
+    /**
+     * Сохраняет в Bitrix24
+     */
+    private function saveToBitrix($domain, $accessToken, $entity, $message, $saveSettings)
+    {
+        if ($saveSettings['save_to_timeline'] ?? true) {
+            if ($this->hasScope('crm'))
+                $this->saveToTimeline($domain, $accessToken,  $message, $entity);
+            else $this->log("Нет доступа к crm. сохранение отменяется");
+        }
+
+        if ($saveSettings['save_to_chat'] ?? false) {
+            if ($this->hasScope('im'))
+                $this->sendToChat($domain, $accessToken, $entity, $message);
+            else $this->log("Нет доступа к чатам. сохранение отменяется");
+        }
+    }
+
+    private function sendToChat($domain, $accessToken, $entity, $message)
+    {
+        try {
+            $ids = [
+                'lead' => 1,
+                'deal' => 2,
+                'contact' => 3,
+                'company' => 4
+            ];
+
+            $entityId = $entity['ID'];
+            $entityTypeId = $ids[$entity['ENTITY_TYPE']];
+
+            $dialogId = null;
+
+            $dialogIdResponse = $this->makeBitrixRequestByHook('crm.timeline.chat.get', [
+                "entityId" => $entityId,
+                "entityTypeId" => $entityTypeId
+            ]);
+
+            if (!empty($dialogIdResponse['result']) && !empty($dialogIdResponse['result']['chatId']))
+                $dialogId = "chat" . $dialogIdResponse['result']['chatId'];
+
+            if (empty($dialogId)) {
+                $this->log("Не удалось получить ID диалога.");
+                return;
+            }
+            $syncId = $message['sync_id'];
+            try {
+                $this->deleteMessages($dialogId, $syncId);
+            } catch (Exception $e) {
+                $this->log("Ошибка при удалении сообщений: " . $e->getMessage());
+            }
+
+
+            $messageParams = [
+                "DIALOG_ID" => $dialogId,
+                "MESSAGE" => $message['title'],
+                "ATTACH" => [
+                    "DESCRIPTION" => "SYNC_ID: " . $syncId,
+                    "COLOR" => "#29619b",
+                    "COLOR_TOKEN" => "secondary",
+                    "BLOCKS" => [
+                        [
+                            "MESSAGE" => $message['text']
+                        ]
+                    ]
+                ]
+            ];
+
+            if (!empty($message['link'])) {
+                $messageParams['ATTACH']["BLOCKS"][] = [
+                    "LINK" => [
+                        "NAME" => "Ссылка на дело",
+                        "LINK" => $message['link']
+                    ]
+                ];
+            }
+
+            $this->makeBitrixRequestByHook('im.message.add', $messageParams);
+            $this->log("Успешно отправлено в чат пользователю ID:");
+        } catch (Exception $e) {
+            $this->log("Ошибка при отправке в чат: " . $e->getMessage());
+        }
+    }
+
+    private function deleteMessages($dialogId, $syncId)
+    {
+        $messagesResponse = $this->makeBitrixRequestByHook('im.dialog.messages.get', [
+            "DIALOG_ID" => $dialogId
+        ]);
+
+        if (empty($messagesResponse['result']) || empty($messagesResponse['result']['messages'])) {
+            $this->log("Чат пустой. Нет сообщений");
+            return;
+        }
+
+        $messagesToDelete = [];
+        foreach ($messagesResponse['result']['messages'] as $message) {
+            if (
+                !empty($message['params']['ATTACH']) &&
+                is_array($message['params']['ATTACH'])
+            ) {
+
+                foreach ($message['params']['ATTACH'] as $attach) {
+                    if (
+                        !empty($attach['DESCRIPTION']) &&
+                        strpos($attach['DESCRIPTION'], "SYNC_ID: " . $syncId) !== false
+                    ) {
+
+                        $messagesToDelete[] = $message['id'];
+                        break;
+                    }
+                }
+            }
+        }
+        if (count($messagesToDelete) > 0) {
+            $this->makeBitrixRequestByHook('im.v2.Chat.Message.delete', [
+                "messageIds" => $messagesToDelete
+            ]);
+            $this->log("Удалены сообщения ID: " . json_encode($messagesToDelete, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        }
+    }
+
+    private function saveToTimeline($domain, $accessToken, $message, $entity)
+    {
+        try {
+            $entityType = $entity['ENTITY_TYPE'];
+            $entityId = $entity['ID'];
+
+            try {
+                $this->deleteTimeline($entityType, $entityId, $message['sync_id']);
+            } catch (Exception $e) {
+                $this->log("Ошибка при удалении комментариев: " . $e->getMessage());
+            }
+
+            $url = "https://{$domain}/rest/crm.timeline.comment.add";
+
+            $messageText = $message['title'] . $message['text'];
+            if (!empty($message['case_link'])) {
+                $messageText .= "\n🔗 **Ссылка:** {$message['case_link']}\n";
+            }
+            $messageText .= "\nSYNC_ID: " . $message['sync_id'];
+
+
+            $fields = [
+                'ENTITY_ID' => $entityId,
+                'ENTITY_TYPE' => $entityType,
+                'COMMENT' => $messageText
+            ];
+
+            if ($entity && isset($entity['ASSIGNED_BY_ID']) && $entity['ASSIGNED_BY_ID'] > 0) {
+                $fields['AUTHOR_ID'] = $entity['ASSIGNED_BY_ID'];
+            }
+
+            $result = $this->makeBitrixRequestByHook('crm.timeline.comment.add', ['fields' => $fields]);
+
+            $this->log("Успешно сохранено в timeline");
+        } catch (Exception $e) {
+            $this->log("Ошибка при сохранении в timeline: " . $e->getMessage());
+        }
+    }
+
+    private function deleteTimeline($entityType, $entityId, $syncId)
+    {
+        $timelineResponse = $this->makeBitrixRequestByHook('crm.timeline.comment.list', [
+            "filter" => [
+                "ENTITY_ID" => $entityId,
+                "ENTITY_TYPE" => $entityType
+            ]
+        ]);
+
+        if (empty($timelineResponse['result']) || !is_array($timelineResponse['result'])) {
+            $this->log("Таймлайн пустой. Нет комментариев");
+            return;
+        }
+
+        $commentsToDelete = [];
+        foreach ($timelineResponse['result'] as $comment) {
+            if (!empty($comment['COMMENT'])) {
+                if (strpos($comment['COMMENT'] ?? '', "SYNC_ID: {$syncId}") !== false) {
+                    $this->log("Найдено соответствие c: " . $comment['ID']);
+                    $commentsToDelete[] = $comment['ID'];
+                }
+
+                // Или поиск по регулярке
+                if (preg_match('/SYNC_ID:\s*(KAD_[a-f0-9]{32})/', $meeting['COMMENT'] ?? '', $matches)) {
+                    if ($matches[1] === $syncId) {
+                        $this->log("Найдено соответствие c: " . $comment['ID']);
+                        $commentsToDelete[] = $comment['ID'];
+                    }
+                }
+            }
+        }
+        foreach ($commentsToDelete as $commentId) {
+            $this->makeBitrixRequestByHook('crm.timeline.comment.delete', [
+                "id" => $commentId,
+            ]);
+            $this->log("Удален комментарий ID: " . $commentId);
         }
     }
 
@@ -538,342 +691,73 @@ class KADSyncService
         }
         if ($existingEvent) {
             $eventData['id'] = $existingEvent['ID'] ?? $existingEvent['id'];
-            $this->makeBitrixRequest('calendar.event.update', $eventData);
+            $this->makeBitrixRequestByHook('calendar.event.update', $eventData);
             $this->log("Событие {$meeting['date']} $caseNumber обновлено");
         } else {
-            $this->makeBitrixRequest('calendar.event.add', $eventData);
+            $this->makeBitrixRequestByHook('calendar.event.add', $eventData);
             $this->log("Событие {$meeting['date']} $caseNumber создано");
         }
     }
 
-    private function findExistingEvent($userMeetings, $caseNumber, $date)
-    {
-        // Генерируем тот же SYNC_ID
-        $dateHash = md5($date . $caseNumber);
-        $syncId = "KAD_{$dateHash}";
-
-        foreach ($userMeetings as $meeting) {
-            // Ищем SYNC_ID в описании
-            if (strpos($meeting['DESCRIPTION'] ?? '', "SYNC_ID: {$syncId}") !== false) {
-                $this->log("Найдено соответствие c: " . $meeting['id'] ?? $meeting['ID']);
-                return $meeting;
-            }
-
-            // Или поиск по регулярке
-            if (preg_match('/SYNC_ID:\s*(KAD_[a-f0-9]{32})/', $meeting['DESCRIPTION'] ?? '', $matches)) {
-                if ($matches[1] === $syncId) {
-                    $this->log("Найдено соответствие c: " . $meeting['id'] ?? $meeting['ID']);
-                    return $meeting;
-                }
-            }
-        }
-
-        return null;
-    }
-
-
-    private function formatCaseMessage($case, $entity)
-    {
-        $message = [
-            'title' => '',
-            'text' => '',
-            'link' => '',
-            'sync_id' => ''
-        ];
-        $message['title'] = "🔄 **Обновление из картотеки арбитражных дел**\n\n";
-
-        $message['text'] .= "📋 **Дело:** {$case['case_number']}\n";
-        $message['text'] .= "📅 **Дата регистрации:** {$case['date']}\n";
-        $message['text'] .= "⚖️ **Суд:** {$case['court']}\n";
-
-        if (!empty($case['judge'])) {
-            $message['text'] .= "👨‍⚖️ **Судья:** {$case['judge']}\n";
-        }
-
-        if (!empty($case['plaintiff'])) {
-            $message['text'] .= "👥 **Истец:** {$case['plaintiff']}\n";
-        }
-
-        if (!empty($case['respondent'])) {
-            $message['text'] .= "👥 **Ответчик:** {$case['respondent']}\n";
-        }
-
-        // Если есть детали дела
-        if (!empty($case['case_details']) && is_array($case['case_details'])) {
-            $message['text'] .= "\n📜 **Cобытия:**\n";
-            foreach ($case['case_details'] as $event) {
-                $message['text'] .= "• {$event['date']} - {$event['type']}";
-                if (!empty($event['result'])) {
-                    $message['text'] .= " ({$event['result']})";
-                }
-                $message['text'] .= "\n";
-            }
-        }
-
-        if (!empty($case['case_link'])) {
-            $message['link'] = $case['case_link'];
-        }
-
-        $message['text'] .= "\n⏰ **Обновлено:** " . date('d.m.Y H:i');
-        $dateHash = md5($case['case_number'] . $entity['ENTITY_TYPE'] . $entity['ID']);
-        $message['sync_id'] = "KAD_{$dateHash}";
-
-
-        return $message;
-    }
     /**
-     * Сохраняет в Bitrix24
+     * Получает данные по номеру дела
      */
-    private function saveToBitrix($entity, $message, $saveSettings)
+    private function fetchKADDataByCaseNumber($caseNumber)
     {
-        $savedAnywhere = false;
-        if ($saveSettings['save_to_timeline'] ?? true) {
-            if ($this->hasScope('crm')){
-                $this->saveToTimeline($message, $entity);
-                $savedAnywhere = true;
-            }
-                
-            else $this->log("Нет доступа к crm. сохранение отменяется");
-        }
+        $apiUrl = 'https://bgdev.site/api/kad/getbyid';
 
-        if ($saveSettings['save_to_chat'] ?? false) {
-            if ($this->hasScope('im')){
-                $this->sendToChat($entity, $message);
-                $savedAnywhere = true;
-            }
-            else $this->log("Нет доступа к чатам. сохранение отменяется");
-        }
-        if(!$savedAnywhere){
-            $this->saveToTimeline($message, $entity);
-        }
-    }
-
-    private function sendToChat($entity, $message)
-    {
-        try {
-            $ids = [
-                'lead' => 1,
-                'deal' => 2,
-                'contact' => 3,
-                'company' => 4
-            ];
-
-            $entityId = $entity['ID'];
-            $entityTypeId = $ids[$entity['ENTITY_TYPE']];
-
-            $dialogId = null;
-
-            $dialogIdResponse = $this->makeBitrixRequest('crm.timeline.chat.get', [
-                "entityId" => $entityId,
-                "entityTypeId" => $entityTypeId
-            ]);
-
-            if (!empty($dialogIdResponse['result']) && !empty($dialogIdResponse['result']['chatId']))
-                $dialogId = "chat" . $dialogIdResponse['result']['chatId'];
-
-            if (empty($dialogId)) {
-                $this->log("Не удалось получить ID диалога.");
-                return;
-            }
-            $syncId = $message['sync_id'];
-            try {
-                $this->deleteMessages($dialogId, $syncId);
-            } catch (Exception $e) {
-                $this->log("Ошибка при удалении сообщений: " . $e->getMessage());
-            }
-
-
-            $messageParams = [
-                "DIALOG_ID" => $dialogId,
-                "MESSAGE" => $message['title'],
-                "ATTACH" => [
-                    "DESCRIPTION" => "SYNC_ID: " . $syncId,
-                    "COLOR" => "#29619b",
-                    "COLOR_TOKEN" => "secondary",
-                    "BLOCKS" => [
-                        [
-                            "MESSAGE" => $message['text']
-                        ]
-                    ]
-                ]
-            ];
-
-            if (!empty($message['link'])) {
-                $messageParams['ATTACH']["BLOCKS"][] = [
-                    "LINK" => [
-                        "NAME" => "Ссылка на дело",
-                        "LINK" => $message['link']
-                    ]
-                ];
-            }
-
-            $this->makeBitrixRequest('im.message.add', $messageParams);
-            $this->log("Успешно отправлено в чат пользователю ID:");
-        } catch (Exception $e) {
-            $this->log("Ошибка при отправке в чат: " . $e->getMessage());
-        }
-    }
-
-    private function deleteMessages($dialogId, $syncId)
-    {
-        $messagesResponse = $this->makeBitrixRequest('im.dialog.messages.get', [
-            "DIALOG_ID" => $dialogId
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $apiUrl,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode([
+                'case_number' => $caseNumber,
+                'include_timeline' => true
+            ]),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Accept: application/json'
+            ],
+            CURLOPT_TIMEOUT => 500,
+            CURLOPT_SSL_VERIFYPEER => false
         ]);
 
-        if (empty($messagesResponse['result']) || empty($messagesResponse['result']['messages'])) {
-            $this->log("Чат пустой. Нет сообщений");
-            return;
+        $response = curl_exec($ch);
+
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError) {
+            throw new Exception("CURL ошибка: {$curlError}");
         }
 
-        $messagesToDelete = [];
-        foreach ($messagesResponse['result']['messages'] as $message) {
-            if (
-                !empty($message['params']['ATTACH']) &&
-                is_array($message['params']['ATTACH'])
-            ) {
-
-                foreach ($message['params']['ATTACH'] as $attach) {
-                    if (
-                        !empty($attach['DESCRIPTION']) &&
-                        strpos($attach['DESCRIPTION'], "SYNC_ID: " . $syncId) !== false
-                    ) {
-
-                        $messagesToDelete[] = $message['id'];
-                        break;
-                    }
-                }
-            }
-        }
-        if (count($messagesToDelete) > 0) {
-            $this->makeBitrixRequest('im.v2.Chat.Message.delete', [
-                "messageIds" => $messagesToDelete
-            ]);
-            $this->log("Удалены сообщения ID: " . json_encode($messagesToDelete, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-        }
-    }
-
-    private function saveToTimeline($message, $entity)
-    {
-        try {
-            $entityType = $entity['ENTITY_TYPE'];
-            $entityId = $entity['ID'];
-
-            try {
-                $this->deleteTimeline($entityType, $entityId, $message['sync_id']);
-            } catch (Exception $e) {
-                $this->log("Ошибка при удалении комментариев: " . $e->getMessage());
-            }
-
-            $messageText = $message['title'] . $message['text'];
-            if (!empty($message['link'])) {
-                $messageText .= "\n🔗 **Ссылка:** {$message['link']}\n";
-            }
-            $messageText .= "\nSYNC_ID: " . $message['sync_id'];
-
-
-            $fields = [
-                'ENTITY_ID' => $entityId,
-                'ENTITY_TYPE' => $entityType,
-                'COMMENT' => $messageText
-            ];
-
-            if ($entity && isset($entity['ASSIGNED_BY_ID']) && $entity['ASSIGNED_BY_ID'] > 0) {
-                $fields['AUTHOR_ID'] = $entity['ASSIGNED_BY_ID'];
-            }
-
-            $result = $this->makeBitrixRequest('crm.timeline.comment.add', ['fields' => $fields]);
-
-            $this->log("Успешно сохранено в timeline");
-        } catch (Exception $e) {
-            $this->log("Ошибка при сохранении в timeline: " . $e->getMessage());
-        }
-    }
-
-    private function deleteTimeline($entityType, $entityId, $syncId)
-    {
-        $timelineResponse = $this->makeBitrixRequest('crm.timeline.comment.list', [
-            "filter" => [
-                "ENTITY_ID" => $entityId,
-                "ENTITY_TYPE" => $entityType
-            ]
-        ]);
-
-        if (empty($timelineResponse['result']) || !is_array($timelineResponse['result'])) {
-            $this->log("Таймлайн пустой. Нет комментариев");
-            return;
+        if ($httpCode !== 200) {
+            throw new Exception("HTTP ошибка: {$httpCode}");
         }
 
-        $commentsToDelete = [];
-        foreach ($timelineResponse['result'] as $comment) {
-            if (!empty($comment['COMMENT'])) {
-                if (strpos($comment['COMMENT'] ?? '', "SYNC_ID: {$syncId}") !== false) {
-                    $this->log("Найдено соответствие c: " . $comment['ID']);
-                    $commentsToDelete[] = $comment['ID'];
-                }
+        $data = json_decode($response, true);
 
-                // Или поиск по регулярке
-                if (preg_match('/SYNC_ID:\s*(KAD_[a-f0-9]{32})/', $meeting['COMMENT'] ?? '', $matches)) {
-                    if ($matches[1] === $syncId) {
-                        $this->log("Найдено соответствие c: " . $comment['ID']);
-                        $commentsToDelete[] = $comment['ID'];
-                    }
-                }
-            }
-        }
-        foreach ($commentsToDelete as $commentId) {
-            $this->makeBitrixRequest('crm.timeline.comment.delete', [
-                "id" => $commentId,
-            ]);
-            $this->log("Удален комментарий ID: " . $commentId);
-        }
-    }
-
-
-    private function updateEntityLastSync($entity, $entityLastSyncField = 'UF_CRM_LAST_SYNC_DATE')
-    {
-        $entityType = $entity['ENTITY_TYPE'] ?? null;
-        $entityId = $entity['ID'] ?? null;
-
-        if (!$entityType || !$entityId) {
-            $this->log("Не удалось обновить время синхронизации: нет типа или ID сущности");
-            return false;
+        if (isset($data['error'])) {
+            throw new Exception("API КАД: " . $data['error']);
         }
 
-        $currentTime = date('Y-m-d H:i:s');
-
-        try {
-
-            $result = $this->makeBitrixRequest("crm.{$entityType}.update", [
-                'id' => $entityId,
-                'fields' => [
-                    $entityLastSyncField => $currentTime
-                ]
-            ]);
-
-            $this->log("Время синхронизации обновлено для {$entityType}#{$entityId}: {$currentTime}");
-            return true;
-        } catch (Exception $e) {
-            $this->log("Исключение при обновлении времени синхронизации: " . $e->getMessage());
-            return false;
-        }
+        return $data;
     }
 
     /**
      * Универсальный метод для запросов к Bitrix24 API
      */
-    private function makeBitrixRequest($method, $params = [])
+    private function makeBitrixRequest($url, $accessToken, $params = [])
     {
-        $domain = $this->subscriptionModel->getDomain();
-        $token = $this->subscriptionModel->getToken();
-        $url = "https://{$domain}/rest/{$method}";
-
-
-        $params['auth'] = $token;
+        // Добавляем access token к параметрам
+        $params['auth'] = $accessToken;
 
         // Логируем запрос
         $this->log("=== Bitrix24 API Запрос ===");
         $this->log("URL: {$url}");
-        $this->log("Access Token: " . substr($token, 0, 20) . "...");
+        $this->log("Access Token: " . substr($accessToken, 0, 20) . "...");
         $this->log("Параметры: " . json_encode($params, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
         $this->log("Метод: POST");
 
@@ -953,6 +837,91 @@ class KADSyncService
         return $result;
     }
 
+    private function makeBitrixRequestByHook($path, $params = [])
+    {
+        $url = "https://b24-tqrxe2.bitrix24.ru/rest/1/ex3g1trf3is250xh/{$path}";
+
+        // Логируем запрос
+        $this->log("=== Bitrix24 API Запрос ===");
+        $this->log("URL: {$url}");
+        $this->log("Параметры: " . json_encode($params, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        $this->log("Метод: POST");
+
+        $ch = curl_init();
+
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => http_build_query($params),
+        ]);
+
+        $startTime = microtime(true);
+        $response = curl_exec($ch);
+        $endTime = microtime(true);
+
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        $totalTime = round(($endTime - $startTime) * 1000, 2); // в мс
+
+        // Получаем дополнительную информацию
+        $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+        $requestSize = curl_getinfo($ch, CURLINFO_REQUEST_SIZE);
+        $downloadSize = curl_getinfo($ch, CURLINFO_SIZE_DOWNLOAD);
+
+        curl_close($ch);
+
+        // Логируем детали запроса
+        $this->log("--- Ответ ---");
+        $this->log("HTTP код: {$httpCode}");
+        $this->log("Время выполнения: {$totalTime} мс");
+        $this->log("Размер запроса: {$requestSize} байт");
+        $this->log("Размер ответа: " . strlen($response) . " байт");
+
+        // Форматируем вывод ответа для читаемости
+        $formattedResponse = $this->formatResponseForLog($response);
+        $this->log("Тело ответа:\n" . $formattedResponse);
+
+        if ($curlError) {
+            $this->log("CURL ошибка: {$curlError}");
+            throw new Exception("CURL ошибка: {$curlError}");
+        }
+
+        if ($httpCode !== 200) {
+            $this->log("ОШИБКА: HTTP код {$httpCode}");
+            throw new Exception("HTTP ошибка: {$httpCode}");
+        }
+
+        $result = json_decode($response, true);
+
+        // Логируем результат парсинга
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $this->log("ОШИБКА парсинга JSON: " . json_last_error_msg());
+            $this->log("Сырой ответ: " . substr($response, 0, 500));
+            throw new Exception("Ошибка парсинга JSON ответа: " . json_last_error_msg());
+        }
+
+        // Логируем структурированный результат
+        $this->log("Успешно распарсен JSON");
+        if (isset($result['result'])) {
+            $resultCount = is_array($result['result']) ? count($result['result']) : 1;
+            $this->log("Результат содержит: {$resultCount} элементов");
+        }
+
+        if (isset($result['error'])) {
+            $errorMsg = $result['error_description'] ?? $result['error'];
+            $this->log("Bitrix24 API ошибка: {$errorMsg}");
+            $this->log("Полный ответ об ошибке: " . json_encode($result, JSON_UNESCAPED_UNICODE));
+            throw new Exception("Bitrix24 API ошибка: " . $errorMsg);
+        }
+
+        $this->log("=== Запрос завершен успешно ===");
+
+        return $result;
+    }
     /**
      * Форматирует ответ для красивого вывода в лог
      */
@@ -1013,14 +982,50 @@ class KADSyncService
         );
     }
 
+    public function run()
+    {
+        $subscriptionModel = new Subscription();
+        $subscriptions = $subscriptionModel->getAllActive();
+
+        if (empty($subscriptions)) {
+            $this->log("Нет активных подписок для синхронизации");
+            return;
+        }
+
+        $this->log("Найдено подписок: " . count($subscriptions));
+
+        foreach ($subscriptions as $subscription) {
+            try {
+
+                if ($subscription['portal']['b24Domain'] == "b24-tqrxe2.bitrix24.ru") {
+                    $this->log("Обработка подписки портала: {$subscription['portal']['b24Domain']}");
+                    $this->syncSubscription($subscription);
+                }
+            } catch (Exception $e) {
+                $this->log("Ошибка подписки портала {$subscription['portal']['b24Domain']}: " . $e->getMessage());
+            }
+        }
+    }
+
     private function hasScope($scope)
     {
         if (empty($this->availibleSkopes) || !is_array($this->availibleSkopes)) {
-            $response = $this->makeBitrixRequest('scope', []);
+            // Запрашиваем scope если еще не получали
+            $response = $this->makeBitrixRequestByHook('scope', []);
             $this->availibleSkopes = $response['result'] ?? [];
-            $this->log("Доступные сущности: " . json_encode($this->availibleSkopes, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
         }
 
         return in_array($scope, $this->availibleSkopes, true);
     }
+}
+
+if (php_sapi_name() === 'cli') {
+    if (!is_dir(__DIR__ . '/logs')) {
+        mkdir(__DIR__ . '/logs', 0777, true);
+    }
+
+    $syncService = new KADSyncService();
+    $syncService->run();
+} else {
+    echo "Запускай через командную строку: php73 run_sync.php";
 }
